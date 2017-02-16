@@ -119,6 +119,7 @@ class LtePhyBase : public ChannelAccess
     simsignal_t averageCqiDlvect_;
     simsignal_t averageCqiUlvect_;
     simsignal_t averageCqiD2Dvect_;
+    simsignal_t sinrVect_;
 
     TaggedSample *tSample_;
 

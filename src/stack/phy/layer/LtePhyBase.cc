@@ -54,6 +54,7 @@ void LtePhyBase::initialize(int stage)
         averageCqiDlvect_ = registerSignal("averageCqiDlvect");
         averageCqiUlvect_ = registerSignal("averageCqiUlvect");
         averageCqiD2Dvect_ = registerSignal("averageCqiD2Dvect");
+        sinrVect_ = registerSignal("SINRvect");
 
         if (!hasListeners(averageCqiDl_))
             error("no phy listeners");
