@@ -1,11 +1,4 @@
-//
 //                           SimuLTE
-//
-// This file is part of a software released under the license included in file
-// "license.pdf". This license can be also found at http://www.ltesimulator.com/
-// The above file and the present reference are part of the software itself,
-// and cannot be removed from it.
-//
 
 #include "LteAmc.h"
 #include "LteMacEnb.h"
@@ -233,6 +226,8 @@ void LteAmc::initialize()
     allocationType_ = getRbAllocationType(mac_->par("rbAllocationType").stringValue());
     lb_ = mac_->par("summaryLowerBound");
     ub_ = mac_->par("summaryUpperBound");
+    numStored_ = mac_->par("cqiStorage");
+    numStored_ = (numStored_ < 0 ) ? 0 : numStored_;
 
     printParameters();
 
@@ -418,6 +413,7 @@ void LteAmc::pushFeedbackD2D(MacNodeId id, LteFeedback fb, MacNodeId peerId)
 
     std::map<MacNodeId, History_> *history = &d2dFeedbackHistory_;
     std::map<MacNodeId, unsigned int> *nodeIndex = &d2dNodeIndex_;
+    std::map<MacNodeId,  PeerHistoryStore_> *historyqueue = &d2dFBStore_;
 
     // Put the feedback in the FBHB
     Remote antenna = fb.getAntennaId();
@@ -442,6 +438,42 @@ void LteAmc::pushFeedbackD2D(MacNodeId id, LteFeedback fb, MacNodeId peerId)
         (*history)[peerId] = newHist;
     }
     (*history)[peerId][antenna].at(index).at(txMode).put(fb);
+
+    EV << NOW << " Pushing CQI :" << numStored_ << endl ;
+
+    if(numStored_ > 0)
+    {
+        EV << NOW << " Storing CQI :" << numStored_ << endl ;
+        if(historyqueue->find(peerId) == historyqueue->end())
+            {
+                PeerHistoryStore_ newPeerStore;
+
+
+                for(char mode = SINGLE_ANTENNA_PORT0; mode <= UL_NUM_TXMODE; mode++)
+                {
+                    newPeerStore[id][antenna].push_back(std::deque<LteSummaryBuffer>{LteSummaryBuffer(fbhbCapacityD2D_, MAXCW, numBands_, lb_, ub_)});
+                }
+
+
+                (*historyqueue)[peerId] = newPeerStore;
+            }
+            else{
+                if((*historyqueue)[peerId][id][antenna].at(txMode).front().getCreationTime() < (NOW - numStored_))
+                {
+                    EV << NOW << " Removing old CQI :" << (*historyqueue)[peerId][id][antenna].at(txMode).front().getCreationTime() << endl ;
+                    (*historyqueue)[peerId][id][antenna].at(txMode).pop_front();
+                    (*historyqueue)[peerId][id][antenna].at(txMode).push_back(LteSummaryBuffer(fbhbCapacityD2D_, MAXCW, numBands_, lb_, ub_));
+
+                }
+                else
+                {
+                    (*historyqueue)[peerId][id][antenna].at(txMode).push_back(LteSummaryBuffer(fbhbCapacityD2D_, MAXCW, numBands_, lb_, ub_));
+                }
+            }
+
+            (*historyqueue)[peerId][id][antenna].at(txMode).back().put(fb);
+
+    }
 
     // DEBUG
     EV << "PeerId: " << peerId << ", Antenna: " << dasToA(antenna) << ", TxMode: " << txMode << ", Index: " << index << endl;
@@ -487,6 +519,25 @@ LteSummaryFeedback LteAmc::getFeedbackD2D(MacNodeId id, Remote antenna, TxMode t
             }
         }
     }
+
+    if((numStored_ > 0) && (NOW > numStored_))
+    {
+        std::deque<LteSummaryBuffer>::reverse_iterator it = d2dFBStore_.at(peerId).at(id).at(antenna).at(txMode).rbegin();
+        for (; it != d2dFBStore_.at(peerId).at(id).at(antenna).at(txMode).rend(); ++it)
+        {
+            EV << NOW << " Checking History :" << (NOW - numStored_) << endl ;
+
+            if (it->getCreationTime() > (NOW - numStored_))
+            {
+                EV << NOW << " Old CQI Dont use: " << it->getCreationTime() << endl ;
+                continue;
+            }
+            EV << NOW << " History Found : " << it->getCreationTime() << endl ;
+            return it->get();
+        }
+        return d2dFBStore_.at(peerId).at(id).at(antenna).at(txMode).front().get();
+    }
+
     return d2dFeedbackHistory_.at(peerId).at(antenna).at(d2dNodeIndex_.at(id)).at(txMode).get();
 }
 
