@@ -48,6 +48,9 @@ simple LteMacBase like LteMac {
         int harqProcesses = default(8);
         int maxHarqRtx = default(4);
         
+        //# CQI Storage for further use
+        double cqiStorage @unit(s) = default(0s);
+         
         //#
         //# Statistic recording: end2end delay and throughput at the mac layer
         //#

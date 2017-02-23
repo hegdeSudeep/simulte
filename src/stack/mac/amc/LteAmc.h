@@ -74,10 +74,17 @@ class LteAmc
     std::vector<UserTxParams> d2dTxParams_;
     typedef std::map<Remote, std::vector<std::vector<LteSummaryBuffer> > > History_;
 
+    typedef std::map<Remote, std::vector<std::deque<LteSummaryBuffer> > > HistoryStore_;
+    typedef std::map<MacNodeId, HistoryStore_> PeerHistoryStore_;
+
     int fType_; //CQI synchronization Debugging
     History_ dlFeedbackHistory_;
     History_ ulFeedbackHistory_;
     std::map<MacNodeId, History_> d2dFeedbackHistory_;
+    std::map<MacNodeId, PeerHistoryStore_> d2dFBStore_;
+
+    simtime_t numStored_; //CQIs Stored per connection
+
     unsigned int fbhbCapacityDl_;
     unsigned int fbhbCapacityUl_;
     unsigned int fbhbCapacityD2D_;

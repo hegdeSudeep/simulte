@@ -650,6 +650,8 @@ class LteSummaryBuffer
     double totCodewords_;
     //! Number of bands.
     double totBands_;
+    //! Creation Time
+    simtime_t summaryCreationTime_;
     //! Cumulative summary feedback.
     LteSummaryFeedback cumulativeSummary_;
     void createSummary(LteFeedback fb);
@@ -675,7 +677,14 @@ class LteSummaryBuffer
         {
             buffer_.pop_front();
         }
+        summaryCreationTime_ = NOW;
         createSummary(fb);
+    }
+
+    //!Get Creation Time
+    simtime_t getCreationTime(void)
+    {
+        return summaryCreationTime_;
     }
 
     //! Get the current summary feedback
