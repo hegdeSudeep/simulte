@@ -133,6 +133,26 @@ simple LteMacBase like LteMac {
         //# signals for indicating buffer overflow
         @signal[macBufferOverflowUl];
         @signal[macBufferOverflowDl];
+        
+        //# MAC layer throughput, delay vectors
+        @signal[macDelayDlvect];
+        @statistic[macDelayDlvect](title="Delay at the MAC layer DL"; unit="s"; source="macDelayDlvect"; record=vector);
+        @signal[macThroughputDlvect];
+        @statistic[macThroughputDlvect](title="Throughput at the MAC layer DL"; unit="Bps"; source="macThroughputDlvect"; record=vector);
+        @signal[macDelayUlvect];
+        @statistic[macDelayUlvect](title="Delay at the MAC layer UL"; unit="s"; source="macDelayUlvect"; record=vector);
+        @signal[macThroughputUlvect];
+        @statistic[macThroughputUlvect](title="Throughput at the MAC layer UL"; unit="Bps"; source="macThroughputUlvect"; record=vector);
+ 		@signal[macCellThroughputUlvect];
+        @statistic[macCellThroughputUlvect](title="Cell Throughput at the MAC layer UL"; unit="Bps"; source="macCellThroughputUlvect"; record=vector);
+        @signal[macCellThroughputDlvect];
+        @statistic[macCellThroughputDlvect](title="Cell Throughput at the MAC layer DL"; unit="Bps"; source="macCellThroughputDlvect"; record=vector);
+        @signal[macDelayD2Dvect];
+        @statistic[macDelayD2Dvect](title="Delay at the MAC layer D2D"; unit="s"; source="macDelayD2Dvect"; record=vector);
+        @signal[macThroughputD2Dvect];
+        @statistic[macThroughputD2Dvect](title="Throughput at the MAC layer D2D"; unit="Bps"; source="macThroughputD2Dvect"; record=vector);
+        @signal[macCellThroughputD2Dvect];
+        @statistic[macCellThroughputD2Dvect](title="Cell Throughput at the MAC layer D2D"; unit="Bps"; source="macCellThroughputD2Dvect"; record=vector);
 
     gates:
         //# 
