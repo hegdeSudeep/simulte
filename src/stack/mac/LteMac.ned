@@ -47,12 +47,15 @@ simple LteMacBase like LteMac {
         //# H-ARQ
         int harqProcesses = default(8);
         int maxHarqRtx = default(4);
+        
+        //# CQI Storage for further use
+        double cqiStorage @unit(s) = default(0s);
          
         //#
         //# Statistic recording: end2end delay and throughput at the mac layer
         //#
         @signal[macDelayDl];
-        @statistic[macDelayDl](title="Delay at the MAC layer UL"; unit="s"; source="macDelayDl"; record=lteAvg);
+        @statistic[macDelayDl](title="Delay at the MAC layer DL"; unit="s"; source="macDelayDl"; record=lteAvg);
         @signal[macThroughputDl];
         @statistic[macThroughputDl](title="Throughput at the MAC layer DL"; unit="Bps"; source="macThroughputDl"; record=lteRate);
         @signal[macDelayUl];
@@ -62,7 +65,7 @@ simple LteMacBase like LteMac {
         @signal[macDelayD2D];
         @statistic[macDelayD2D](title="Delay at the MAC layer D2D"; unit="s"; source="macDelayD2D"; record=lteAvg);
         @signal[macThroughputD2D];
-        @statistic[macThroughputD2D](title="Throughput at the MAC layer D2D"; unit="Bps"; source="macThroughputD2D"; record=lteRate);
+        @statistic[macThroughputD2D](title="Throughput at the MAC layer D2D"; unit="Bps"; source="macThroughputD2D"; record=lteRate); 
         @signal[macCellThroughputUl];
         @statistic[macCellThroughputUl](title="Cell Throughput at the MAC layer UL"; unit="Bps"; source="macCellThroughputUl"; record=lteRate);
         @signal[macCellThroughputDl];
@@ -133,7 +136,7 @@ simple LteMacBase like LteMac {
         //# signals for indicating buffer overflow
         @signal[macBufferOverflowUl];
         @signal[macBufferOverflowDl];
-
+        
     gates:
         //# 
         //# Gates connecting RLC and MAC Layers
