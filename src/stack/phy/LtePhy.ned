@@ -57,6 +57,9 @@ simple LtePhyBase like LtePhy {
         @statistic[averageCqiD2D](title="Average Cqi reported in D2D"; unit="cqi"; source="averageCqiD2D"; record=lteAvg);
         @signal[averageCqiD2Dvect];
         @statistic[averageCqiD2Dvect](title="Average Cqi reported in D2D"; unit="cqi"; source="averageCqiD2Dvect"; record=vector);
+        //# SINR Statistics
+        @signal[SINRvect];
+        @statistic[SINRvect](title="SINR reported"; unit="sinr"; source="SINRvect"; record=vector);
         
     gates:
         input upperGateIn;       // from upper layer

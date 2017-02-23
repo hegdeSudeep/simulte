@@ -150,8 +150,49 @@ void LtePhyUeD2D::handleAirFrame(cMessage* msg)
         }
         else
         {
+            std::vector<Cqi> cqiReadVector = lteInfo->getUserTxParams()->readCqiVector();
+            std::vector<Cqi>::iterator cqit;
+            int i = 0;
+            for(cqit = cqiReadVector.begin();cqit!=cqiReadVector.end();++cqit)
+            {
+                EV << "LtePhyUeD2D: CQI for code word " << i << ":" << *cqit <<"\n";
+                ++i;
+            }
             emit(averageCqiD2D_, tSample_);
             emit(averageCqiD2Dvect_,cqi);
+
+            std::vector<UeInfo*> * ueList = binder_->getUeList();
+
+            std::vector<UeInfo*> ::iterator ut;
+            for(ut=ueList->begin();ut!=ueList->end();++ut)
+            {
+                if((*ut)->id == lteInfo->getDestId())
+                {
+                    std::vector<double> sinrV = channelModel_->getSINR_D2D(frame, lteInfo, lteInfo->getDestId(), (*ut)->phy->getCoord(), binder_->getNextHop(lteInfo->getSourceId()));
+                    double sum = 0.0;
+                    unsigned int allocatedRbs = 0;
+                    RbMap rbmap = lteInfo->getGrantedBlocks();
+                    RbMap::iterator it;
+                    std::map<Band, unsigned int>::iterator jt;
+                    //for each Remote unit used to transmit the packet
+                    for (it = rbmap.begin(); it != rbmap.end(); ++it)
+                    {
+                        //for each logical band used to transmit the packet
+                        for (jt = it->second.begin(); jt != it->second.end(); ++jt)
+                        {
+                            Band band = jt->first;
+                            if (jt->second == 0) // this Rb is not allocated
+                                continue;
+
+                            sum += sinrV.at(band);
+                            allocatedRbs++;
+                        }
+                    }
+                    emit(sinrVect_, (sum / allocatedRbs));
+                    break;
+                }
+            }
+
         }
     }
     // apply decider to received packet
