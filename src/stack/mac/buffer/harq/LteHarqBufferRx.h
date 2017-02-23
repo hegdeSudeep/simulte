@@ -46,6 +46,10 @@ class LteHarqBufferRx
     simsignal_t macCellThroughput_;
     simsignal_t macThroughput_;
 
+    simsignal_t macDelayvect_;
+    simsignal_t macCellThroughputvect_;
+    simsignal_t macThroughputvect_;
+
     // reference to the eNB module
     cModule* nodeB_;
 

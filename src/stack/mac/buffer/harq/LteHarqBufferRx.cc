@@ -37,6 +37,10 @@ LteHarqBufferRx::LteHarqBufferRx(unsigned int num, LteMacBase *owner,
         macThroughput_ = getMacByMacNodeId(nodeId_)->registerSignal("macThroughputUl");
         macCellThroughput_ = macOwner_->registerSignal("macCellThroughputUl");
 
+        macDelayvect_ = macOwner_->registerSignal("macDelayUlvect");
+        macThroughputvect_ = getMacByMacNodeId(nodeId_)->registerSignal("macThroughputUlvect");
+        macCellThroughputvect_ = macOwner_->registerSignal("macCellThroughputUlvect");
+
         tSampleCell_->module_ = check_and_cast<cComponent*>(macOwner_);
         tSample_->module_ = check_and_cast<cComponent*>(getMacByMacNodeId(nodeId_));
     }
@@ -46,6 +50,10 @@ LteHarqBufferRx::LteHarqBufferRx(unsigned int num, LteMacBase *owner,
         macThroughput_ = macOwner_->registerSignal("macThroughputDl");
         macCellThroughput_ = nodeB_->registerSignal("macCellThroughputDl");
         macDelay_ = macOwner_->registerSignal("macDelayDl");
+
+        macThroughputvect_ = macOwner_->registerSignal("macThroughputDlvect");
+        macCellThroughputvect_ = nodeB_->registerSignal("macCellThroughputDlvect");
+        macDelayvect_ = macOwner_->registerSignal("macDelayDlvect");
 
         tSampleCell_->module_ = nodeB_;
         tSample_->module_ = macOwner_;
@@ -153,6 +161,7 @@ std::list<LteMacPdu *> LteHarqBufferRx::extractCorrectPdus()
 
                 // emit delay statistic
                 macOwner_->emit(macDelay_, tSample_);
+                macOwner_->emit(macDelayvect_, tSample_->sample_);
 
                 // Calculate Throughput by sending the number of bits for this packet
                 tSample_->sample_ = size;
@@ -176,6 +185,9 @@ std::list<LteMacPdu *> LteHarqBufferRx::extractCorrectPdus()
                 // emit throughput statistics
                 nodeB_->emit(macCellThroughput_, tSampleCell_);
                 macOwner_->emit(macThroughput_, tSample_);
+
+                nodeB_->emit(macCellThroughputvect_, (tSampleCell_->sample_ / ((temp->getArrivalTime() - temp->getCreationTime()).dbl())));
+                macOwner_->emit(macThroughputvect_, (tSample_->sample_ / ((temp->getArrivalTime() - temp->getCreationTime()).dbl())));
 
                 macOwner_->dropObj(temp);
                 ret.push_back(temp);
