@@ -469,10 +469,21 @@ double LteRealisticChannelModel::getAttenuation_D2D(MacNodeId nodeId, Direction 
     //double sqrDistance = myCoord_.distance(coord);
     double sqrDistance = coord.distance(coord_2);
 
+//    if (dir == DL) // sender is UE
+//        speed = computeSpeed(nodeId, myCoord_);
+//    else //UL or D2D
+//        speed = computeSpeed(nodeId, coord);
+
     if (dir == DL) // sender is UE
+    {
         speed = computeSpeed(nodeId, myCoord_);
+        movement = (positionHistory_.find(nodeId) == positionHistory_.end()) ? .0 : positionHistory_[nodeId].front().second.distance(coord);
+    }
     else //UL or D2D
+    {
         speed = computeSpeed(nodeId, coord);
+        movement = (positionHistory_.find(nodeId) == positionHistory_.end()) ? .0 : positionHistory_[nodeId].front().second.distance(myCoord_);
+    }
 
     //If traveled distance is greater than correlation distance UE could have changed its state and
     // its visibility from eNodeb, hence it is correct to recompute the los probability
