@@ -8,11 +8,18 @@
 #include <LteMaxDatarate.h>
 
 LteMaxDatarate::LteMaxDatarate() {
-    // TODO Auto-generated constructor stub
-
+    EV_STATICCONTEXT;
+    EV << "LteMaxDatarate::constructor" << std::endl;
 }
 
-LteMaxDatarate::~LteMaxDatarate() {
-    // TODO Auto-generated destructor stub
+LteMaxDatarate::~LteMaxDatarate() {}
+
+void LteMaxDatarate::prepareSchedule() {
+    EV_STATICCONTEXT;
+    EV << "LteMaxDatarate::prepareSchedule" << std::endl;
 }
 
+void LteMaxDatarate::commitSchedule() {
+    EV_STATICCONTEXT;
+    EV << "LteMaxDatarate::commitSchedule" << std::endl;
+}
