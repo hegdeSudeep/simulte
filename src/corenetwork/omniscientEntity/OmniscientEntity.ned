@@ -26,6 +26,8 @@ simple OmniscientEntity {
         double configTimepoint = default(0.05); 
         // The entity will take a snapshot of the some network statistics every x seconds.
         double updateInterval = default(0.05); 
+        // 180kHz is LTE's bandwidth per resource block as per its specification.
+        double resourceBlockBandwidth @unit(kHz) = default(180kHz);
     @display("i=block/table");
     @class(OmniscientEntity);    
 }

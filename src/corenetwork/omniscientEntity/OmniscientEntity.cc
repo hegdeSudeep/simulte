@@ -80,6 +80,22 @@ public:
     }
 
     /**
+     * Applies the Shannon-Hartley theorem C=B*log2(1 + SINR).
+     * @param from Channel starting point.
+     * @param to Channel end point.
+     * @param time Moment in time. Used for SINR computation.
+     * @param transmissionPower from's transmission power. Used for SINR computation.
+     * @param direction Transmission direction. Used for SINR computation.
+     * @return The channel capacity = maximum throughput of the channel.
+     */
+    double getChannelCapacity(const MacNodeId from, const MacNodeId to, const SimTime time, const double transmissionPower, const Direction direction) const {
+        double sinr = getMean(getSINR(from, to, time, transmissionPower, direction));
+        // Apply Shannon-Hartley theorem.
+        double capacity = mBandwidth * log2(1 + sinr);
+        return capacity;
+    }
+
+    /**
      * @param from Channel starting point.
      * @param to Channel end point.
      * @param band A specific band.
@@ -106,7 +122,9 @@ public:
     }
 
     /**
-     * @return The computed CQI.
+     * @param transmissionMode
+     * @param sinr
+     * @return A CQI computed from SINR and transmission mode.
      */
     Cqi getCqi(const TxMode transmissionMode, const double sinr) const {
         return mFeedbackComputer->getCqi(transmissionMode, sinr);
@@ -192,31 +210,17 @@ public:
      * @return If time>=NOW the current value is computed. For earlier moments the memory is queried.
      */
     std::vector<double> getSINR(MacNodeId from, MacNodeId to, SimTime time) const {
-        // Make sure eNodeB is the target.
+        // Determine direction.
+        Direction dir = determineDirection(from, to);
+
+        // Make sure eNodeB is the target so that getDeviceInfo() is not given the eNodeB's ID.
         if (from == mENodeBId) {
             MacNodeId temp = from;
             from = to;
             to = temp;
         }
 
-        // Determine direction.
-        Direction dir;
-        if (from == mENodeBId)
-            dir = Direction::DL; // eNodeB -DL-> UE.
-        else if (to == mENodeBId)
-            dir = Direction::UL; // UE -UL-> eNodeB.
-        else
-            dir = Direction::D2D; // UE -D2D-> UE.
-
-        // Determine transmission power because it's not set correctly in a device's associated UeInfo object.
-        double transmissionPower;
-        std::string modulePath = getDeviceInfo(from)->ue->getFullPath() + ".nic.phy";
-        cModule *mod = getModuleByPath(modulePath.c_str()); // Get a pointer to the device's module.
-        if (dir == Direction::D2D)
-            transmissionPower = mod->par("d2dTxPower");
-        else
-            transmissionPower = mod->par("ueTxPower");
-
+        double transmissionPower = getTransmissionPower(from, dir);
         return getSINR(from, to, time, transmissionPower, dir);
     }
 
@@ -224,7 +228,7 @@ public:
      * @param device The device's node ID.
      * @return The IMobility that describes this node's mobility. See inet/src/inet/mobility/contract/IMobility.h for implementation.
      */
-    IMobility* getMobility(const MacNodeId device) const {
+    IMobility* getMobility(const MacNodeId& device) const {
         cModule *host = nullptr;
         try {
             UeInfo* ueInfo = getDeviceInfo(device);
@@ -246,7 +250,7 @@ public:
      * @param device The device's node ID.
      * @return The device's physical position. Coord.{x,y,z} are publicly available.
      */
-    Coord getPosition(const MacNodeId device) const {
+    Coord getPosition(const MacNodeId& device) const {
       return getMobility(device)->getCurrentPosition();
     }
 
@@ -254,15 +258,47 @@ public:
      * @param device The device's node ID.
      * @return The device's physical current speed. Coord.{x,y,z} are publicly available.
      */
-    Coord getSpeed(const MacNodeId device) const {
+    Coord getSpeed(const MacNodeId& device) const {
         return getMobility(device)->getCurrentSpeed();
     }
 
-    double getMean(const std::vector<double> values) const {
+    double getMean(const std::vector<double>& values) const {
         double sum = 0.0;
         for (size_t i = 0; i < values.size(); i++)
             sum += values.at(i);
         return (sum / ((double) values.size()));
+    }
+
+    /**
+     * @param from
+     * @param to
+     * @return The transmission direction.
+     */
+    Direction determineDirection(const MacNodeId& from, const MacNodeId& to) const {
+        Direction dir;
+        if (from == mENodeBId)
+            dir = Direction::DL; // eNodeB -DL-> UE.
+        else if (to == mENodeBId)
+            dir = Direction::UL; // UE -UL-> eNodeB.
+        else
+            dir = Direction::D2D; // UE -D2D-> UE.
+        return dir;
+    }
+
+    /**
+     * Transmission power is not set correctly in a device's associated UeInfo object.
+     * @param device
+     * @return The transmission power as set in the .NED for this UE.
+     */
+    double getTransmissionPower(const MacNodeId& device, Direction dir) const {
+        double transmissionPower;
+        std::string modulePath = getDeviceInfo(device)->ue->getFullPath() + ".nic.phy";
+        cModule *mod = getModuleByPath(modulePath.c_str()); // Get a pointer to the device's module.
+        if (dir == Direction::D2D)
+            transmissionPower = mod->par("d2dTxPower");
+        else
+            transmissionPower = mod->par("ueTxPower");
+        return transmissionPower;
     }
 
 protected:
@@ -272,6 +308,7 @@ protected:
         // That's why final configuration needs to take place a bit later.
         mConfigTimepoint = par("configTimepoint").doubleValue();
         mUpdateInterval = par("updateInterval").doubleValue();
+        mBandwidth = par("resourceBlockBandwidth").doubleValue();
         mMemory = new Memory(mUpdateInterval, 15.0, this);
         scheduleAt(mConfigTimepoint, mConfigMsg);
         // Schedule first update.
@@ -337,16 +374,21 @@ protected:
                   to = ueInfo->at(1)->id;
         Cqi cqi_computed_d2d = getCqi(from, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
             cqi_reported_d2d = getReportedCqi(from, to, 0, Direction::D2D, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_computed_cellular = getCqi(from, mENodeBId, NOW, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_reported_cellular = getReportedCqi(from, mENodeBId, 0, Direction::UL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_computed_cellular2 = getCqi(mENodeBId, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_reported_cellular2 = getReportedCqi(mENodeBId, to, 0, Direction::DL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0);
+            cqi_computed_cellular_UL = getCqi(from, mENodeBId, NOW, TxMode::SINGLE_ANTENNA_PORT0),
+            cqi_reported_cellular_UL = getReportedCqi(from, mENodeBId, 0, Direction::UL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
+            cqi_computed_cellular_DL = getCqi(mENodeBId, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
+            cqi_reported_cellular_DL = getReportedCqi(mENodeBId, to, 0, Direction::DL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0);
         EV << "CQI_computed_d2d=" << cqi_computed_d2d << " CQI_reported_d2d=" << cqi_reported_d2d << std::endl;
-        EV << "CQI_computed_cellular=" << cqi_computed_cellular << " CQI_reported_cellular=" << cqi_reported_cellular << std::endl;
-        EV << "CQI_computed_cellular2=" << cqi_computed_cellular2 << " CQI_reported_cellular2=" << cqi_reported_cellular2 << std::endl;
-        if (cqi_computed_d2d != cqi_reported_d2d || cqi_computed_cellular != cqi_reported_cellular || cqi_computed_cellular2 != cqi_reported_cellular2)
+        EV << "CQI_computed_cellular_UL=" << cqi_computed_cellular_UL << " CQI_reported_cellular_UL=" << cqi_reported_cellular_UL << std::endl;
+        EV << "CQI_computed_cellular_DL=" << cqi_computed_cellular_DL << " CQI_reported_cellular_DL=" << cqi_reported_cellular_DL << std::endl;
+        if (cqi_computed_d2d != cqi_reported_d2d || cqi_computed_cellular_UL != cqi_reported_cellular_UL || cqi_computed_cellular_DL != cqi_reported_cellular_DL)
             throw cRuntimeError(std::string("OmniscientEntity::configure didn't find the same values for reported and calculated CQI!").c_str());
-        EV << "SINR_mean=" << getMean(getSINR(from, to, NOW)) << std::endl;
+        double sinr_d2d = getMean(getSINR(from, to, NOW));
+        double sinr_ul = getMean(getSINR(from, mENodeBId, NOW));
+        double sinr_dl = getMean(getSINR(mENodeBId, from, NOW));
+        EV << "SINR_d2d=" << sinr_d2d << std::endl;
+        EV << "SINR_UL=" << sinr_ul << std::endl;
+        EV << "SINR_DL=" << sinr_dl << std::endl;
     }
 
     void handleMessage(cMessage *msg) {
@@ -470,7 +512,8 @@ private:
     cMessage    *mSnapshotMsg = nullptr,
                 *mConfigMsg = nullptr;
     double      mUpdateInterval,
-                mConfigTimepoint;
+                mConfigTimepoint,
+                mBandwidth;
     LteAmc      *mAmc = nullptr;
     LteRealisticChannelModel    *mChannelModel = nullptr;
     MacNodeId mENodeBId;
