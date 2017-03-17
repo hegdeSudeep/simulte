@@ -6,23 +6,43 @@
 #include <LteSchedulerEnb.h>
 
 LteMaxDatarate::LteMaxDatarate() {
+    mOracle = OmniscientEntity::get();
     EV_STATICCONTEXT;
-    EV << "LteMaxDatarate::constructor" << std::endl;
+    EV << "\t" << (mOracle == nullptr ? "Couldn't find oracle." : "Found oracle.") << std::endl;
 }
 
 LteMaxDatarate::~LteMaxDatarate() {}
 
 void LteMaxDatarate::prepareSchedule() {
     EV_STATICCONTEXT;
-    EV << "LteMaxDatarate::prepareSchedule" << std::endl;
+    EV << NOW << "LteMaxDatarate::prepareSchedule" << std::endl;
 
+    // Copy currently active connections to a working copy.
     activeConnectionTempSet_ = activeConnectionSet_;
-    EV << "EMPTY=" << activeConnectionTempSet_.empty() << std::endl;
-    EV <<"RBs available: " << eNbScheduler_->readTotalAvailableRbs() << std::endl;
+    // Go through all connections.
     for (ActiveSet::iterator iterator = activeConnectionTempSet_.begin(); iterator != activeConnectionTempSet_.end (); ++iterator) {
-        MacCid cid = *iterator;
-        MacNodeId nodeId = MacCidToNodeId(cid);
-        EV << "MacCid=" << cid << " MacNodeId=" << nodeId << std::endl;
+        MacCid currentConnection = *iterator;
+        MacNodeId nodeId = MacCidToNodeId(currentConnection);
+        EV << "\tMacCid=" << currentConnection << " MacNodeId=" << nodeId << std::endl;
+
+        // Make sure the current node has not been dynamically removed.
+        if (getBinder()->getOmnetId(nodeId) == 0){
+            activeConnectionTempSet_.erase(currentConnection);
+            EV << "\t\t has been dynamically removed. Skipping..." << std::endl;
+            continue;
+        }
+
+        // Determine direction. Uplink and downlink resources are scheduled separately,
+        // and LteScheduler's 'direction_' contains the current scheduling direction.
+        Direction dir;
+        // Uplink may be reused for D2D, so we have to check if the Buffer Status Report (BSR) tells us that this is a D2D link.
+        if (direction_ == UL)
+            dir = (MacCidToLcid(currentConnection) == D2D_SHORT_BSR) ? D2D : direction_;
+        else
+            dir = DL;
+
+
+
     }
 }
 
@@ -31,12 +51,12 @@ void LteMaxDatarate::commitSchedule() {
     EV << "LteMaxDatarate::commitSchedule" << std::endl;
 }
 
-void LteMaxDatarate::notifyActiveConnection(MacCid cid) {
-    EV << NOW << "LteMaxDatarate::notifyActiveConnection(MacCid=" << cid<< " [MacNodeId=" << MacCidToNodeId(cid) << "])" << std::endl;
-    activeConnectionSet_.insert(cid);
+void LteMaxDatarate::notifyActiveConnection(MacCid conectionId) {
+    EV << NOW << "LteMaxDatarate::notifyActiveConnection(MacCid=" << conectionId << " [MacNodeId=" << MacCidToNodeId(conectionId) << "])" << std::endl;
+    activeConnectionSet_.insert(conectionId);
 }
 
-void LteMaxDatarate::removeActiveConnection(MacCid cid) {
-    EV << NOW << "LteMaxDatarate::removeActiveConnection(MacCid=" << cid<< " [MacNodeId=" << MacCidToNodeId(cid) << "])" << std::endl;
-    activeConnectionSet_.erase(cid);
+void LteMaxDatarate::removeActiveConnection(MacCid conectionId) {
+    EV << NOW << "LteMaxDatarate::removeActiveConnection(MacCid=" << conectionId << " [MacNodeId=" << MacCidToNodeId(conectionId) << "])" << std::endl;
+    activeConnectionSet_.erase(conectionId);
 }

@@ -7,6 +7,7 @@
 
 #include <LteScheduler.h>
 #include "LteCommon.h"
+#include <omniscientEntity.h>
 
 /**
  * Implementation of the algorithm proposed by
@@ -44,6 +45,9 @@ public:
      * When the LteSchedulerEnb learns of a connection going inactive it notifies the LteScheduler.
      */
     void removeActiveConnection(MacCid cid) override;
+
+protected:
+    OmniscientEntity* mOracle = nullptr;
 };
 
 #endif /* STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_ */
