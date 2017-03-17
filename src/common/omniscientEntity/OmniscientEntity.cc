@@ -528,7 +528,7 @@ private:
     public:
         Memory(double resolution, double maxSimTime, OmniscientEntity *parent)
                 : mResolution(resolution), mMaxSimTime(maxSimTime), mParent(parent),
-                  mTimepoints((unsigned int) (maxSimTime / resolution)) {}
+                  mTimepoints((unsigned int) (maxSimTime / resolution) + 1) {}
         virtual ~Memory() {}
 
         /**
