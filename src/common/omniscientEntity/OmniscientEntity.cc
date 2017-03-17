@@ -294,10 +294,17 @@ public:
         double transmissionPower;
         std::string modulePath = getDeviceInfo(device)->ue->getFullPath() + ".nic.phy";
         cModule *mod = getModuleByPath(modulePath.c_str()); // Get a pointer to the device's module.
-        if (dir == Direction::D2D)
-            transmissionPower = mod->par("d2dTxPower");
-        else
-            transmissionPower = mod->par("ueTxPower");
+        try {
+            if (dir == Direction::D2D)
+                transmissionPower = mod->par("d2dTxPower");
+            else
+                transmissionPower = mod->par("ueTxPower");
+        } catch (const cRuntimeError& e) {
+            // @TODO This error shouldn't happen! If there's more than one UE in UED2DTX array, then for the second one there's no parameter 'd2dTxPower'.
+            EV_ERROR << "OmniscientEntity::getTransmissionPower(MacNodeId= " << device << ") encountered exception:" << e.what()
+                    << std::endl << " Using default value \"transmissionPower=24.14973348\"" << std::endl;
+            transmissionPower = 24.14973348;
+        }
         return transmissionPower;
     }
 
@@ -348,12 +355,12 @@ protected:
         std::vector<UeInfo*>* ueInfo = getUeInfo();
         EV << "\tThere are " << ueInfo->size() << " UEs in the network: " << std::endl;
         for (size_t i = 0; i < ueInfo->size(); i++)
-            EV << "\t\t#" << i << ": has MacNodeId " << ueInfo->at(i)->id << " and OmnetID " << getId(ueInfo->at(i)->id) << std::endl;
+            EV << "\t\t#" << i+1 << ": has MacNodeId " << ueInfo->at(i)->id << " and OmnetID " << getId(ueInfo->at(i)->id) << std::endl;
         // eNodeB...
         std::vector<EnbInfo*>* EnbInfo = getEnbInfo();
         EV << "\tThere are " << EnbInfo->size() << " EnBs in the network: " << std::endl;
         for (size_t i = 0; i < EnbInfo->size(); i++)
-            EV << "\t\t#" << i << ": has MacNodeId " << EnbInfo->at(i)->id << " and OmnetID " << getId(ueInfo->at(i)->id) << std::endl;
+            EV << "\t\t#" << i+1 << ": has MacNodeId " << EnbInfo->at(i)->id << " and OmnetID " << getId(ueInfo->at(i)->id) << std::endl;
 
         // Get a pointer to the channel model.
         mChannelModel = ueInfo->at(0)->realChan;
@@ -370,25 +377,26 @@ protected:
             EV << "\tConstructed feedback computer." << endl;
 
         // Test the different interfaces.
-        MacNodeId from = ueInfo->at(0)->id,
-                  to = ueInfo->at(1)->id;
-        Cqi cqi_computed_d2d = getCqi(from, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_reported_d2d = getReportedCqi(from, to, 0, Direction::D2D, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_computed_cellular_UL = getCqi(from, mENodeBId, NOW, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_reported_cellular_UL = getReportedCqi(from, mENodeBId, 0, Direction::UL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_computed_cellular_DL = getCqi(mENodeBId, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
-            cqi_reported_cellular_DL = getReportedCqi(mENodeBId, to, 0, Direction::DL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0);
-        EV << "CQI_computed_d2d=" << cqi_computed_d2d << " CQI_reported_d2d=" << cqi_reported_d2d << std::endl;
-        EV << "CQI_computed_cellular_UL=" << cqi_computed_cellular_UL << " CQI_reported_cellular_UL=" << cqi_reported_cellular_UL << std::endl;
-        EV << "CQI_computed_cellular_DL=" << cqi_computed_cellular_DL << " CQI_reported_cellular_DL=" << cqi_reported_cellular_DL << std::endl;
-        if (cqi_computed_d2d != cqi_reported_d2d || cqi_computed_cellular_UL != cqi_reported_cellular_UL || cqi_computed_cellular_DL != cqi_reported_cellular_DL)
-            throw cRuntimeError(std::string("OmniscientEntity::configure didn't find the same values for reported and calculated CQI!").c_str());
-        double sinr_d2d = getMean(getSINR(from, to, NOW));
-        double sinr_ul = getMean(getSINR(from, mENodeBId, NOW));
-        double sinr_dl = getMean(getSINR(mENodeBId, from, NOW));
-        EV << "SINR_d2d=" << sinr_d2d << std::endl;
-        EV << "SINR_UL=" << sinr_ul << std::endl;
-        EV << "SINR_DL=" << sinr_dl << std::endl;
+//        MacNodeId from = ueInfo->at(0)->id,
+//                  to = ueInfo->at(1)->id;
+//        EV << "Testing CQI(UE" << from << ", UE" << to << ")" << std::endl;
+//        Cqi cqi_computed_d2d = getCqi(from, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
+//            cqi_reported_d2d = getReportedCqi(from, to, 0, Direction::D2D, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
+//            cqi_computed_cellular_UL = getCqi(from, mENodeBId, NOW, TxMode::SINGLE_ANTENNA_PORT0),
+//            cqi_reported_cellular_UL = getReportedCqi(from, mENodeBId, 0, Direction::UL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0),
+//            cqi_computed_cellular_DL = getCqi(mENodeBId, to, NOW, TxMode::SINGLE_ANTENNA_PORT0),
+//            cqi_reported_cellular_DL = getReportedCqi(mENodeBId, to, 0, Direction::DL, Remote::MACRO, TxMode::SINGLE_ANTENNA_PORT0);
+//        EV << "CQI_computed_d2d=" << cqi_computed_d2d << " CQI_reported_d2d=" << cqi_reported_d2d << std::endl;
+//        EV << "CQI_computed_cellular_UL=" << cqi_computed_cellular_UL << " CQI_reported_cellular_UL=" << cqi_reported_cellular_UL << std::endl;
+//        EV << "CQI_computed_cellular_DL=" << cqi_computed_cellular_DL << " CQI_reported_cellular_DL=" << cqi_reported_cellular_DL << std::endl;
+//        if (cqi_computed_d2d != cqi_reported_d2d || cqi_computed_cellular_UL != cqi_reported_cellular_UL || cqi_computed_cellular_DL != cqi_reported_cellular_DL)
+//            throw cRuntimeError(std::string("OmniscientEntity::configure didn't find the same values for reported and calculated CQI!").c_str());
+//        double sinr_d2d = getMean(getSINR(from, to, NOW));
+//        double sinr_ul = getMean(getSINR(from, mENodeBId, NOW));
+//        double sinr_dl = getMean(getSINR(mENodeBId, from, NOW));
+//        EV << "SINR_d2d=" << sinr_d2d << std::endl;
+//        EV << "SINR_UL=" << sinr_ul << std::endl;
+//        EV << "SINR_DL=" << sinr_dl << std::endl;
     }
 
     void handleMessage(cMessage *msg) {

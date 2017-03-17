@@ -33,6 +33,17 @@ public:
      * Put the results from prepareSchedule() into the actually-used object 'activeConnectionSet_'.
      */
     virtual void commitSchedule() override;
+
+    /**
+     * When the LteSchedulerEnb learns of an active connection it notifies the LteScheduler.
+     * It is essential to save this information. (I think this should be the default behaviour and be done in the LteScheduler class)
+     */
+    void notifyActiveConnection(MacCid cid) override;
+
+    /**
+     * When the LteSchedulerEnb learns of a connection going inactive it notifies the LteScheduler.
+     */
+    void removeActiveConnection(MacCid cid) override;
 };
 
 #endif /* STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_ */
