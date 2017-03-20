@@ -7,7 +7,7 @@
 
 #include <LteScheduler.h>
 #include "LteCommon.h"
-#include <omniscientEntity.h>
+#include <OmniscientEntity.h>
 
 /**
  * Implementation of the algorithm proposed by

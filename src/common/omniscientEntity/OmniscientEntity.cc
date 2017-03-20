@@ -13,7 +13,7 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 //
 
-#include "omniscientEntity.h"
+#include <OmniscientEntity.h>
 
 /**
  * Derived class exposes otherwise hidden deployer_ member pointer.

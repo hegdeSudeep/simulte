@@ -41,7 +41,11 @@ void LteMaxDatarate::prepareSchedule() {
         else
             dir = DL;
 
+        const UserTxParams& info = eNbScheduler_->mac_->getAmc()->computeTxParams(nodeId,dir);
+        const std::set<Band>& bands = info.readBands();
+        EV << "System Bands = " << eNbScheduler_->mac_->getAmc()->getSystemNumBands() << std::endl;
 
+        EV << "Available Bands = " << bands.size() << std::endl;
 
     }
 }
