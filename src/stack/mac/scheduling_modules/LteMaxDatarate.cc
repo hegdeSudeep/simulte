@@ -23,12 +23,12 @@ void LteMaxDatarate::prepareSchedule() {
     for (ActiveSet::iterator iterator = activeConnectionTempSet_.begin(); iterator != activeConnectionTempSet_.end (); ++iterator) {
         MacCid currentConnection = *iterator;
         MacNodeId nodeId = MacCidToNodeId(currentConnection);
-        EV << "\tMacCid=" << currentConnection << " MacNodeId=" << nodeId << std::endl;
+        EV << NOW << "\tMacCid=" << currentConnection << " MacNodeId=" << nodeId << std::endl;
 
         // Make sure the current node has not been dynamically removed.
         if (getBinder()->getOmnetId(nodeId) == 0){
             activeConnectionTempSet_.erase(currentConnection);
-            EV << "\t\t has been dynamically removed. Skipping..." << std::endl;
+            EV << NOW << "\t\t has been dynamically removed. Skipping..." << std::endl;
             continue;
         }
 
@@ -41,12 +41,37 @@ void LteMaxDatarate::prepareSchedule() {
         else
             dir = DL;
 
-        const UserTxParams& info = eNbScheduler_->mac_->getAmc()->computeTxParams(nodeId,dir);
-        const std::set<Band>& bands = info.readBands();
-        EV << "System Bands = " << eNbScheduler_->mac_->getAmc()->getSystemNumBands() << std::endl;
+//        // Compute available bands.
+//        const std::set<Band>& usableBands = eNbScheduler_->mac_->getAmc()->computeTxParams(nodeId,dir).readBands();
+//        int maxBands = eNbScheduler_->mac_->getAmc()->getSystemNumBands();
+//        EV << "\t\tcan use " << usableBands.size() << " out of " << maxBands << " bands: ";
+//        for (std::set<Band>::const_iterator it = usableBands.begin(); it != usableBands.end(); it++)
+//            EV << "#" << *it << " " ;
+//        EV << std::endl;
 
-        EV << "Available Bands = " << bands.size() << std::endl;
+        // Determine device's maximum transmission power.
+        double maxTransmitPower = mOracle->getTransmissionPower(nodeId, dir);
+        // Go through all bands and estimate maximum throughput.
+        int maxBands = eNbScheduler_->mac_->getAmc()->getSystemNumBands();
+        std::priority_queue<SortedDesc<Band, double>> sortedBands;
+        // Contains SINR for each band.
+        std::vector<double> SINRs = mOracle->getSINR(nodeId, mOracle->getEnodeBId(), NOW, maxTransmitPower, dir);
 
+//        for (std::set<Band>::const_iterator it = usableBands.begin(); it != usableBands.end(); it++) {
+        for (size_t i = 0; i < (unsigned int) maxBands; i++) {
+            Band currentBand = Band(i);
+            double associatedSinr = SINRs.at(currentBand);
+            double estimatedThroghput_cellular = mOracle->getChannelCapacity(associatedSinr);
+            SortedDesc<Band, double> bandEntry(currentBand, estimatedThroghput_cellular);
+            sortedBands.push(bandEntry);
+        }
+
+        EV << NOW << "\t\tBands are now sorted by their estimated throughput:" << std::endl;
+        for (size_t i = 0; i < sortedBands.size(); i++) {
+            SortedDesc<Band, double> bandEntry = sortedBands.top();
+            sortedBands.pop();
+            EV << NOW << "\t\t\tBand" << i << ": " << bandEntry.x_ << " has throughput " << bandEntry.score_ << "." << std::endl;
+        }
     }
 }
 

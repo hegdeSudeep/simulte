@@ -44,14 +44,10 @@ public:
 
     /**
      * Applies the Shannon-Hartley theorem C=B*log2(1 + SINR).
-     * @param from Channel starting point.
-     * @param to Channel end point.
-     * @param time Moment in time. Used for SINR computation.
-     * @param transmissionPower from's transmission power. Used for SINR computation.
-     * @param direction Transmission direction. Used for SINR computation.
+     * @param sinr The (Signal / Noise + Interference) ratio.
      * @return The channel capacity = maximum throughput of the channel.
      */
-    double getChannelCapacity(const MacNodeId from, const MacNodeId to, const SimTime time, const double transmissionPower, const Direction direction) const;
+    double getChannelCapacity(const double sinr) const;
 
     /**
      * @param from Channel starting point.
@@ -132,6 +128,8 @@ public:
      * @return The transmission power as set in the .NED for this UE.
      */
     double getTransmissionPower(const MacNodeId& device, Direction dir) const;
+
+    MacNodeId getEnodeBId() const;
 
 protected:
 

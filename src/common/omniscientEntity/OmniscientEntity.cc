@@ -57,8 +57,7 @@ OmniscientEntity::~OmniscientEntity() {
         delete mSnapshotMsg;
 }
 
-double OmniscientEntity::getChannelCapacity(const MacNodeId from, const MacNodeId to, const SimTime time, const double transmissionPower, const Direction direction) const {
-    double sinr = getMean(getSINR(from, to, time, transmissionPower, direction));
+double OmniscientEntity::getChannelCapacity(const double sinr) const {
     // Apply Shannon-Hartley theorem.
     double capacity = mBandwidth * log2(1 + sinr);
     return capacity;
@@ -105,6 +104,7 @@ std::vector<double> OmniscientEntity::getSINR(MacNodeId from, MacNodeId to, cons
     }
     // Compute current value.
     if (time >= NOW) {
+        EV << "OmniscientEntity::getSINR computes current value." << std::endl;
         LteAirFrame* frame = new LteAirFrame("feedback_pkt");
         UserControlInfo* uinfo = new UserControlInfo();
         uinfo->setFrameType(FEEDBACKPKT);
@@ -138,6 +138,7 @@ std::vector<double> OmniscientEntity::getSINR(MacNodeId from, MacNodeId to, cons
         return SINRs;
     // Retrieve from memory.
     } else {
+        EV << "OmniscientEntity::getSINR fetches value from memory." << std::endl;
         return mMemory->get(time, from, to);
     }
 }
@@ -221,6 +222,10 @@ double OmniscientEntity::getTransmissionPower(const MacNodeId& device, Direction
         transmissionPower = 24.14973348;
     }
     return transmissionPower;
+}
+
+MacNodeId OmniscientEntity::getEnodeBId() const {
+    return mENodeBId;
 }
 
 void OmniscientEntity::initialize() {

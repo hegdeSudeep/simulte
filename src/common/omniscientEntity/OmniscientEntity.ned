@@ -23,7 +23,7 @@ simple OmniscientEntity {
         double lambdaMaxTh = default(0.2);
         double lambdaRatioTh = default(20);
         // The simulation time at which final configuration takes place.
-        double configTimepoint = default(0.05); 
+        double configTimepoint = default(0.005); 
         // The entity will take a snapshot of the some network statistics every x seconds.
         double updateInterval = default(0.05); 
         // 180kHz is LTE's bandwidth per resource block as per its specification.

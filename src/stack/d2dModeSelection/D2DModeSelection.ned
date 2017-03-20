@@ -41,3 +41,8 @@ simple D2DModeSelectionBestCqi extends D2DModeSelectionBase
     parameters:
         @class("D2DModeSelectionBestCqi");
 }
+
+simple D2DModeSelectionMaxDatarate extends D2DModeSelectionBase {
+	parameters:
+	    @class("D2DModeSelectionMaxDatarate");    
+}
