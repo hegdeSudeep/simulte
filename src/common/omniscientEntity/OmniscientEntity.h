@@ -84,16 +84,9 @@ public:
      * @param direction The transmission direction.
      * @return If time>=NOW the current value is computed. For earlier moments the memory is queried.
      */
-    std::vector<double> getSINR(MacNodeId from, MacNodeId to, const SimTime time, const double transmissionPower, const Direction direction) const;
+    std::vector<double> getSINROld(MacNodeId from, MacNodeId to, const SimTime time, const double transmissionPower, const Direction direction) const;
 
-    /**
-     * Determines direction and transmission power automatically.
-     * @param from Transmitter ID.
-     * @param to Receiver ID.
-     * @param time Moment in time.
-     * @return If time>=NOW the current value is computed. For earlier moments the memory is queried.
-     */
-    std::vector<double> getSINR(MacNodeId from, MacNodeId to, SimTime time) const;
+    std::vector<double> getSINR(const MacNodeId from, const MacNodeId to, const SimTime time, const double txPower) const;
 
     /**
      * @param device The device's node ID.
@@ -130,6 +123,14 @@ public:
     double getTransmissionPower(const MacNodeId& device, Direction dir) const;
 
     MacNodeId getEnodeBId() const;
+
+    /**
+     * If used in conjunction with D2DModeSelectionMaxDatarate mode selection discipline,
+     * this OmniscientEntity is made aware of the <from, <to, mode>> map that the mode selection
+     * uses. The MaxDatarate scheduler makes use of it to determine D2D channel endpoints.
+     */
+    const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* getModeSelectionMap() const;
+    void setModeSelectionMap(const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* map);
 
 protected:
 
@@ -183,6 +184,7 @@ private:
     ExposedFeedbackComputer *mFeedbackComputer = nullptr;
     LteDeployer *mDeployer = nullptr;
     Coord mENodeBPosition;
+    const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* mModeSelectionMap = nullptr;
 
 
     /**

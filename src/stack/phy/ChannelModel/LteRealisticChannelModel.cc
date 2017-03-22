@@ -15,6 +15,7 @@
 #include "LteCommon.h"
 #include "ExtCell.h"
 #include "LtePhyUe.h"
+#include "OmniscientEntity.h"
 
 // attenuation value to be returned if max. distance of a scenario has been violated
 // and tolerating the maximum distance violation is enabled
@@ -790,7 +791,9 @@ std::vector<double> LteRealisticChannelModel::getSINR(LteAirFrame *frame, UserCo
         speed = computeSpeed(ueId, coord);
 
         // get position of Ue and eNb
+
         ueCoord = coord;
+//        enbCoord = OmniscientEntity::get()->getPosition(eNbId);
         enbCoord = myCoord_;
     }
 

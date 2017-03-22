@@ -5,6 +5,7 @@
 #ifndef STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_
 #define STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_
 
+#include <omnetpp.h>
 #include <LteScheduler.h>
 #include "LteCommon.h"
 #include <OmniscientEntity.h>
@@ -48,6 +49,15 @@ public:
 
 protected:
     OmniscientEntity* mOracle = nullptr;
+
+    /**
+     * Determines first match for a D2D endpoint for this node
+     * according to the mode selection map provided by the MaxDatarate mode selector.
+     * @TODO Find a better way of finding the endpoint. Right now only one D2D peer is considered.
+     * @param srcNode D2D channel starting node.
+     * @return D2D channel end node.
+     */
+    MacNodeId determineD2DEndpoint(MacNodeId srcNode) const;
 };
 
 #endif /* STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_ */
