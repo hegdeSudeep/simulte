@@ -4,6 +4,7 @@
 
 #include <LteMaxDatarate.h>
 #include <LteSchedulerEnb.h>
+#include <MaxDatarateSorter.h>
 
 LteMaxDatarate::LteMaxDatarate() {
     mOracle = OmniscientEntity::get();
@@ -19,21 +20,30 @@ LteMaxDatarate::~LteMaxDatarate() {}
 MacNodeId LteMaxDatarate::determineD2DEndpoint(MacNodeId srcNode) const {
     EV_STATICCONTEXT;
     EV << NOW << " LteMaxDatarate::determineD2DEndpoint" << std::endl;
+    // Grab <from, <to, mode>> map for all 'from' nodes.
     const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* map = mOracle->getModeSelectionMap();
     if (map == nullptr)
         throw cRuntimeError("LteMaxDatarate::determineD2DEndpoint couldn't get a mode selection map from the oracle.");
+    // From there, grab <src, <to, mode>> for given 'srcNode'.
     const std::map<MacNodeId, LteD2DMode> destinationModeMap = map->at(srcNode);
     if (destinationModeMap.size() <= 0)
-        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint couldn't find an end point from node " + std::to_string(srcNode)).c_str());
+        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint <src, <to, mode>> map is empty -> couldn't find an end point from node " + std::to_string(srcNode)).c_str());
     MacNodeId dstNode = 0;
     bool foundIt = false;
+    // Go through all possible destinations.
     for (std::map<MacNodeId, LteD2DMode>::const_iterator iterator = destinationModeMap.begin();
             iterator != destinationModeMap.end(); iterator++) {
-        if ((*iterator).second == Direction::D2D) {
+        EV << "\tChecking candidate node " << (*iterator).first << "... ";
+        // Check if it wanted to run in Direct Mode.
+        if ((*iterator).second == LteD2DMode::DM) {
+            // If yes, then consider this the endpoint.
+            // @TODO this seems like a hacky workaround. >1 endpoints are not supported with this approach.
             foundIt = true;
             dstNode = (*iterator).first;
+            EV << "found D2D partner." << std::endl;
             break;
         }
+        EV << "nope." << std::endl;
     }
     if (!foundIt)
         throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint couldn't find an end point from node " + std::to_string(srcNode)).c_str());
@@ -47,7 +57,17 @@ void LteMaxDatarate::prepareSchedule() {
 
     // Copy currently active connections to a working copy.
     activeConnectionTempSet_ = activeConnectionSet_;
-    // Go through all connections.
+    int numBands;
+    try {
+        numBands = mOracle->getNumberOfBands();
+    } catch (const cRuntimeError& e) {
+        EV << "Oracle not yet ready. Skipping scheduling round." << std::endl;
+        return;
+    }
+    // For all connections, we want all resource blocks sorted by their estimated maximum datarate.
+    // The sorter holds each connection's info: from, to, direction, datarate and keeps entries
+    // sorted by datarate in descending order.
+    MaxDatarateSorter sorter(numBands);
     for (ActiveSet::iterator iterator = activeConnectionTempSet_.begin(); iterator != activeConnectionTempSet_.end (); ++iterator) {
         MacCid currentConnection = *iterator;
         MacNodeId nodeId = MacCidToNodeId(currentConnection);
@@ -68,35 +88,32 @@ void LteMaxDatarate::prepareSchedule() {
         else
             dir = DL;
 
-//        // Compute available bands.
-//        const std::set<Band>& usableBands = eNbScheduler_->mac_->getAmc()->computeTxParams(nodeId,dir).readBands();
-//        int maxBands = eNbScheduler_->mac_->getAmc()->getSystemNumBands();
-//        EV << "\t\tcan use " << usableBands.size() << " out of " << maxBands << " bands: ";
-//        for (std::set<Band>::const_iterator it = usableBands.begin(); it != usableBands.end(); it++)
-//            EV << "#" << *it << " " ;
-//        EV << std::endl;
+        EV << "\tNode " << nodeId << " wants to transmit in " << dirToA(dir) << " direction." << std::endl;
 
         // Determine device's maximum transmission power.
         double maxTransmitPower = mOracle->getTransmissionPower(nodeId, dir);
-        // We want to find the channel capacity for all bands.
-        int maxBands = eNbScheduler_->mac_->getAmc()->getSystemNumBands();
-        // The priority_queue auto-sorts.
-        std::priority_queue<SortedDesc<Band, double>> sortedBands;
         // We need the SINR values for each band.
         std::vector<double> SINRs;
+        MacNodeId destinationId;
+        // SINR computation depends on the direction.
         switch (dir) {
+            // Uplink: node->eNB
             case Direction::UL: {
-                SINRs = mOracle->getSINR(nodeId, mOracle->getEnodeBId(), NOW, maxTransmitPower);
+                destinationId = mOracle->getEnodeBId();
+                SINRs = mOracle->getSINR(nodeId, destinationId, NOW, maxTransmitPower);
                 EV << "From node " << nodeId << " to eNodeB " << mOracle->getEnodeBId() << " (Uplink)" << std::endl;
                 break;
             }
+            // Downlink: eNB->node
             case Direction::DL: {
-                SINRs = mOracle->getSINR(mOracle->getEnodeBId(), nodeId , NOW, maxTransmitPower);
+                destinationId = nodeId;
+                SINRs = mOracle->getSINR(mOracle->getEnodeBId(), destinationId , NOW, maxTransmitPower);
                 EV << "From eNodeB " << mOracle->getEnodeBId() << " to node " << nodeId << " (Downlink)" << std::endl;
                 break;
             }
+            // Direct: node->node
             case Direction::D2D: {
-                MacNodeId destinationId = determineD2DEndpoint(nodeId);
+                destinationId = determineD2DEndpoint(nodeId);
                 SINRs = mOracle->getSINR(nodeId, destinationId, NOW, maxTransmitPower);
                 EV << "From node " << nodeId << " to node " << destinationId << " (Direct Link)" << std::endl;
                 break;
@@ -107,24 +124,25 @@ void LteMaxDatarate::prepareSchedule() {
             }
         }
 
-//        for (std::set<Band>::const_iterator it = usableBands.begin(); it != usableBands.end(); it++) {
         // Go through all bands ...
-        for (size_t i = 0; i < (unsigned int) maxBands; i++) {
+        for (size_t i = 0; i < SINRs.size(); i++) {
             Band currentBand = Band(i);
-            // Estimate cellular throughput.
+            // Estimate maximum throughput.
             double associatedSinr = SINRs.at(currentBand);
             double estimatedThroughput = mOracle->getChannelCapacity(associatedSinr);
-            SortedDesc<Band, double> bandEntry(currentBand, estimatedThroughput);
-            sortedBands.push(bandEntry);
-        }
-
-        EV << NOW << "\t\tBands are now sorted by their estimated throughput:" << std::endl;
-        for (size_t i = 0; i < sortedBands.size(); i++) {
-            SortedDesc<Band, double> bandEntry = sortedBands.top();
-            sortedBands.pop();
-            EV << NOW << "\t\t\tBand " << bandEntry.x_ << " has throughput " << bandEntry.score_ << "." << std::endl;
+            // And put the result into the container.
+            sorter.put(currentBand, IdRatePair(nodeId, destinationId, maxTransmitPower, estimatedThroughput, dir));
         }
     }
+
+    // We now have all <band, id> combinations sorted by expected datarate.
+    EV << "RBs sorted according to their throughputs: " << std::endl;
+    EV << sorter.toString() << std::endl;
+
+    for (Band band = 0; band < sorter.size(); band++) {
+
+    }
+
 }
 
 void LteMaxDatarate::commitSchedule() {

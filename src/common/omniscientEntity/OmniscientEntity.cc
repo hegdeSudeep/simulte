@@ -271,6 +271,12 @@ double euclideanDistance(Coord from, Coord to) {
     return sqrt(pow(from.x - to.x, 2) + pow(from.y - to.y, 2) + pow(from.z - to.z, 2));
 }
 
+int OmniscientEntity::getNumberOfBands() const {
+    if (mAmc == nullptr)
+        throw cRuntimeError("OmniscientEntity::getNumberOfBands called before it could set the AMC reference!");
+    return mAmc->getSystemNumBands();
+}
+
 void OmniscientEntity::initialize() {
     EV << "OmniscientEntity::initialize" << std::endl;
     // This entity is being initialized before a lot of other entities, like the eNodeBs and UEs, are deployed.

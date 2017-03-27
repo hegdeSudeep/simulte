@@ -132,6 +132,8 @@ public:
     const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* getModeSelectionMap() const;
     void setModeSelectionMap(const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* map);
 
+    int getNumberOfBands() const;
+
 protected:
 
     void initialize() override;
