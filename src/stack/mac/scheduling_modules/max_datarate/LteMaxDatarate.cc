@@ -107,7 +107,8 @@ void LteMaxDatarate::prepareSchedule() {
             // Downlink: eNB->node
             case Direction::DL: {
                 destinationId = nodeId;
-                SINRs = mOracle->getSINR(mOracle->getEnodeBId(), destinationId , NOW, maxTransmitPower);
+                nodeId = mOracle->getEnodeBId();
+                SINRs = mOracle->getSINR(nodeId, destinationId , NOW, maxTransmitPower);
                 EV << "From eNodeB " << mOracle->getEnodeBId() << " to node " << nodeId << " (Downlink)" << std::endl;
                 break;
             }
@@ -131,7 +132,7 @@ void LteMaxDatarate::prepareSchedule() {
             double associatedSinr = SINRs.at(currentBand);
             double estimatedThroughput = mOracle->getChannelCapacity(associatedSinr);
             // And put the result into the container.
-            sorter.put(currentBand, IdRatePair(nodeId, destinationId, maxTransmitPower, estimatedThroughput, dir));
+            sorter.put(currentBand, IdRatePair(currentConnection, nodeId, destinationId, maxTransmitPower, estimatedThroughput, dir));
         }
     }
 
@@ -139,15 +140,99 @@ void LteMaxDatarate::prepareSchedule() {
     EV << "RBs sorted according to their throughputs: " << std::endl;
     EV << sorter.toString() << std::endl;
 
+    // Go through all bands.
     for (Band band = 0; band < sorter.size(); band++) {
+        std::vector<IdRatePair> list = sorter.at(band);
+        if (list.size() < 1) {
+            EV << "Skipping empty list for band " << band << "." << std::endl;
+            continue;
+        }
+        // Assign first band to best candidate.
+        IdRatePair& bestCandidate = list.at(0);
 
+        EV << NOW << "LteMaxDatarate::prepareScheduler granting " << bestCandidate.from << " -"
+           << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to << std::endl;
+        bool terminate = false;
+        bool active = true;
+        bool eligible = true;
+        // The BandLimit should make sure that only the current band is scheduled.
+        BandLimit bandLimit(band);
+        std::vector<BandLimit> bandLimitVec;
+        bandLimitVec.push_back(bandLimit);
+        unsigned int granted = requestGrant(bestCandidate.connectionId, 4294967295U, terminate, active, eligible, &bandLimitVec);
+        EV << NOW << "LteMaxDatarate::prepareSchedule granted " << granted << " bytes to connection "
+           << bestCandidate.from << " -" << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to << std::endl;
+
+        // Exit immediately if the terminate flag is set.
+        if (terminate) {
+            EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
+            break;
+        }
+
+        // Set the connection as inactive if indicated by the grant.
+        if (!active) {
+            EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
+            activeConnectionTempSet_.erase (bestCandidate.from);
+            continue;
+        }
+
+        // Now check if the same candidate should be assigned consecutive resource blocks.
+        for (Band consecutiveBand = band + 1; consecutiveBand < sorter.size(); consecutiveBand++) {
+            // Determine throughput for halved transmit power.
+            double halvedTxPower = bestCandidate.txPower / 2;
+            std::vector<double> consecutiveSINRs = mOracle->getSINR(bestCandidate.from, bestCandidate.to, NOW, halvedTxPower);
+            double associatedSinr = consecutiveSINRs.at(consecutiveBand);
+            double estimatedThroughput = mOracle->getChannelCapacity(associatedSinr);
+            EV << "Determined throughput for consecutive band " << consecutiveBand << " at halved transmit power of "
+               << halvedTxPower << ": " << estimatedThroughput << std::endl;
+
+            // Is this better than the next best candidate?
+            std::vector<IdRatePair> consecutiveList = sorter.at(consecutiveBand);
+            IdRatePair& bestConsecutiveCandidate = consecutiveList.at(0);
+            if (bestConsecutiveCandidate.rate < estimatedThroughput) {
+                EV << "Consecutive throughput at halved txPower is still better than the best candidate: "
+                   << bestConsecutiveCandidate.rate << " < " << estimatedThroughput << std::endl;
+                // Assign this band also.
+                bool consecutiveTerminate = false;
+                bool consecutiveActive = true;
+                bool consecutiveEligible = true;
+                BandLimit consecutiveBandLimit(consecutiveBand);
+                std::vector<BandLimit> consecutiveBandLimitVec;
+                consecutiveBandLimitVec.push_back(consecutiveBandLimit);
+                unsigned int consecutiveGranted = requestGrant(bestCandidate.connectionId, 4294967295U,
+                        consecutiveTerminate, consecutiveActive, consecutiveEligible, &consecutiveBandLimitVec);
+                EV << NOW << "LteMaxDatarate::prepareSchedule granted consecutive " << consecutiveGranted << " bytes to connection "
+                   << bestCandidate.from << " -" << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to << std::endl;
+
+                // Update band counter so that this band is not double-assigned.
+                band++;
+                // Update txPower so that next consecutive assignment halves txPower again.
+                bestCandidate.txPower = halvedTxPower;
+
+                // Exit immediately if the terminate flag is set.
+                if (consecutiveTerminate) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
+                    return;
+                }
+
+                // Set the connection as inactive if indicated by the grant.
+                if (!consecutiveActive) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
+                    break;
+                }
+            // Throughput at halved power is not the best candidate.
+            } else {
+                EV << "Consecutive throughput at halved txPower is not better than the best candidate: "
+                   << bestConsecutiveCandidate.rate << " >= " << estimatedThroughput << std::endl;
+            }
+        }
     }
-
 }
 
 void LteMaxDatarate::commitSchedule() {
     EV_STATICCONTEXT;
     EV << "LteMaxDatarate::commitSchedule" << std::endl;
+    activeConnectionSet_ = activeConnectionTempSet_;
 }
 
 void LteMaxDatarate::notifyActiveConnection(MacCid conectionId) {

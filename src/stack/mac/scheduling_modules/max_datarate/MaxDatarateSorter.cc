@@ -26,6 +26,10 @@ const IdRatePair& MaxDatarateSorter::get(const Band& band, const size_t& positio
   return mBandToIdRate.at(band).at(position);
 }
 
+const std::vector<IdRatePair> MaxDatarateSorter::at(const Band& band) const {
+    return mBandToIdRate.at(band);
+}
+
 size_t MaxDatarateSorter::size() const {
     return mBandToIdRate.size();
 }
@@ -36,7 +40,7 @@ std::string MaxDatarateSorter::toString() const {
     descr += "Band " + std::to_string(i) + ":\n";
     for (size_t j = 0; j < mBandToIdRate.at(i).size(); j++) {
       const IdRatePair& pair = mBandToIdRate.at(i).at(j);
-      descr += "\t" + std::to_string(pair.from) + "-" + dirToA(pair.dir) + "->"
+      descr += "\t" + std::to_string(pair.from) + " -" + dirToA(pair.dir) + "-> "
               + std::to_string(pair.to) + " @" + std::to_string(pair.txPower) + "dB"
               + " with throughput " + std::to_string(pair.rate) + "\n";
     }

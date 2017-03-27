@@ -11,8 +11,10 @@
 
 class IdRatePair {
   public:
-    IdRatePair(const MacNodeId& from, const MacNodeId& to, double txPower, const double rate, const Direction& dir)
-        : from(from), to(to), rate(rate), txPower(txPower), dir(dir) {}
+    IdRatePair(const MacCid& connectionId, const MacNodeId& from, const MacNodeId& to, double txPower, const double rate, const Direction& dir)
+        : connectionId(connectionId), from(from), to(to), rate(rate), txPower(txPower), dir(dir) {}
+
+    MacCid connectionId;
     MacNodeId from, to;
     double rate, txPower;
     Direction dir;
@@ -43,6 +45,7 @@ class MaxDatarateSorter {
      * @return The xth best node according to throughput.
      */
     const IdRatePair& get(const Band& band, const size_t& position) const;
+    const std::vector<IdRatePair> at(const Band& band) const;
 
     std::string toString() const;
     /**
