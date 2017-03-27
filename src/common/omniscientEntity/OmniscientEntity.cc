@@ -14,6 +14,7 @@
 //
 
 #include <OmniscientEntity.h>
+#include <LtePhyBase.h>
 
 /**
  * Derived class exposes otherwise hidden deployer_ member pointer.
@@ -38,7 +39,7 @@ public:
 OmniscientEntity* OmniscientEntity::SINGLETON = nullptr;
 
 OmniscientEntity::OmniscientEntity()
-    : mBinder(getBinder()), // getBinder() provided LteCommon.h
+    : mBinder(getBinder()),
       mSnapshotMsg(new cMessage("OmniscientEnity::snapshot")),
       mConfigMsg(new cMessage("OmniscientEntity::config")),
       mUpdateInterval(0.01) // Will be properly set to provided .NED value in initialize()
@@ -337,7 +338,8 @@ void OmniscientEntity::configure() {
     }
 
     // Get a pointer to the channel model.
-    mChannelModel = ueInfo->at(0)->realChan;
+    mChannelModel = check_and_cast<LteRealisticChannelModel*>(ueInfo->at(0)->phy->getChannelModel());
+//    check_and_cast<LtePhyBase*>(info->ue->getSubmodule("nic")->getSubmodule("phy"));
     if (mChannelModel != nullptr)
         EV << "\tFound channel model." << std::endl;
     else
