@@ -339,7 +339,7 @@ void OmniscientEntity::configure() {
 
     // Get a pointer to the channel model.
     mChannelModel = check_and_cast<LteRealisticChannelModel*>(ueInfo->at(0)->phy->getChannelModel());
-//    check_and_cast<LtePhyBase*>(info->ue->getSubmodule("nic")->getSubmodule("phy"));
+//    mChannelModel = ueInfo->at(0)->realChan; // Doesn't work for non-D2D simulations.
     if (mChannelModel != nullptr)
         EV << "\tFound channel model." << std::endl;
     else
