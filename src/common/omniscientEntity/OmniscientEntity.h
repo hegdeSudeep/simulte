@@ -204,8 +204,9 @@ private:
          * @param sinr SINR value.
          */
         void put(const SimTime time, const MacNodeId from, const MacNodeId to, const std::vector<double> sinrs) {
-            double position = (time.dbl() / mResolution);
-            if (position >= mTimepoints.size()) {
+            double positionDouble = (time.dbl() / mResolution);
+            int position = (int) positionDouble; // Round down.
+            if (((size_t) position) >= mTimepoints.size()) {
                 std::string err = "OmniscientEntity::Memory::put Position " + std::to_string(position) + " > maxPosition " + std::to_string(mTimepoints.size()) + "\n";
                 throw cRuntimeError(err.c_str());
             }

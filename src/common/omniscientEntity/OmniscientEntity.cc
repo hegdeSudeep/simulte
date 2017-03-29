@@ -285,7 +285,10 @@ void OmniscientEntity::initialize() {
     mConfigTimepoint = par("configTimepoint").doubleValue();
     mUpdateInterval = par("updateInterval").doubleValue();
     mBandwidth = par("resourceBlockBandwidth").doubleValue();
-    mMemory = new Memory(mUpdateInterval, 15.0, this);
+    cConfigOption simTimeConfig("sim-time-limit", true, cConfigOption::Type::CFG_DOUBLE, "s", "300", "");
+    double maxSimTime = getEnvir()->getConfig()->getAsDouble(&simTimeConfig, 300.0);
+
+    mMemory = new Memory(mUpdateInterval, maxSimTime, this);
     scheduleAt(mConfigTimepoint, mConfigMsg);
     // Schedule first update.
     scheduleAt(mConfigTimepoint + mUpdateInterval, mSnapshotMsg);
