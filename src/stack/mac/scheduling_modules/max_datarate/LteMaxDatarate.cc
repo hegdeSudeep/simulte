@@ -147,10 +147,10 @@ void LteMaxDatarate::prepareSchedule() {
             EV << "Skipping empty list for band " << band << "." << std::endl;
             continue;
         }
-        // Assign first band to best candidate.
+        // Assign band to best candidate.
         IdRatePair& bestCandidate = list.at(0);
 
-        EV << NOW << "LteMaxDatarate::prepareScheduler granting " << bestCandidate.from << " -"
+        EV << NOW << "LteMaxDatarate::prepareSchedule granting " << bestCandidate.from << " -"
            << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to << std::endl;
         bool terminate = false;
         bool active = true;
@@ -172,7 +172,7 @@ void LteMaxDatarate::prepareSchedule() {
         // Set the connection as inactive if indicated by the grant.
         if (!active) {
             EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
-            activeConnectionTempSet_.erase (bestCandidate.from);
+            activeConnectionTempSet_.erase(bestCandidate.from);
             continue;
         }
 
