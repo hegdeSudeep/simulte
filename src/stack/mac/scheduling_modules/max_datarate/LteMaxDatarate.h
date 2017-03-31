@@ -23,6 +23,10 @@
  */
 class LteMaxDatarate : public virtual LteScheduler {
 public:
+    enum SchedulingResult {
+        OK = 0, TERMINATE, INACTIVE, INELIGIBLE
+    };
+
     LteMaxDatarate();
     virtual ~LteMaxDatarate();
 
@@ -58,6 +62,11 @@ protected:
      * @return D2D channel end node.
      */
     MacNodeId determineD2DEndpoint(MacNodeId srcNode) const;
+
+    /**
+     * Helper method that requests a grant for the specified connection.
+     */
+    LteMaxDatarate::SchedulingResult schedule(MacCid connectionId, Band band);
 };
 
 #endif /* STACK_MAC_SCHEDULING_MODULES_LTEMAXDATARATE_H_ */

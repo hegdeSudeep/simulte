@@ -26,7 +26,7 @@ const IdRatePair& MaxDatarateSorter::get(const Band& band, const size_t& positio
   return mBandToIdRate.at(band).at(position);
 }
 
-const std::vector<IdRatePair> MaxDatarateSorter::at(const Band& band) const {
+const std::vector<IdRatePair>& MaxDatarateSorter::at(const Band& band) const {
     return mBandToIdRate.at(band);
 }
 
@@ -35,7 +35,7 @@ size_t MaxDatarateSorter::size() const {
 }
 
 std::string MaxDatarateSorter::toString() const {
-    std::string descr = "";
+  std::string descr = "";
   for (size_t i = 0; i < mBandToIdRate.size(); i++) {
     descr += "Band " + std::to_string(i) + ":\n";
     for (size_t j = 0; j < mBandToIdRate.at(i).size(); j++) {
@@ -46,4 +46,14 @@ std::string MaxDatarateSorter::toString() const {
     }
   }
   return descr;
+}
+
+void MaxDatarateSorter::remove(const MacNodeId id) {
+  for (size_t i = 0; i < mBandToIdRate.size(); i++) {
+    std::vector<IdRatePair>& currentBandVec = mBandToIdRate.at(i);
+    for (size_t j = 0; j < currentBandVec.size(); j++) {
+      if (currentBandVec.at(j).from == id)
+        currentBandVec.erase(currentBandVec.begin() + j);
+    }
+  }
 }

@@ -39,27 +39,32 @@ class MaxDatarateSorter {
     void put(const Band& band, const IdRatePair& idRatePair);
 
     /**
+     * Removes 'id' from all elements in this container where element.from == 'id'.
+     * @param id
+     */
+    void remove(const MacNodeId id);
+
+    /**
      *
      * @param band
      * @param position
      * @return The xth best node according to throughput.
      */
     const IdRatePair& get(const Band& band, const size_t& position) const;
-    const std::vector<IdRatePair> at(const Band& band) const;
+    const std::vector<IdRatePair>& at(const Band &band) const;
 
-    std::string toString() const;
     /**
      * @return The number of bands.
      */
     size_t size() const;
 
+    std::string toString() const;
 
-  protected:
 
   private:
     /**
      * The outer vector corresponds to the bands.
-     * Each inner vector holds an always-sorted list of <id, rate> pairs, with the best rate first.
+     * Each inner vector holds an always-sorted list of <id, rate> pairs in descending order rate-wise.
     **/
     std::vector<std::vector<IdRatePair>> mBandToIdRate;
     const size_t mNumBands;
