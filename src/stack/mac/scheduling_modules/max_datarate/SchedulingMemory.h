@@ -32,12 +32,21 @@ class SchedulingMemory {
     void put(const MacNodeId id, const Band band);
 
     /**
+     * Notify that 'id' transmits in 'dir' direction.
+     * @param id
+     * @param dir
+     */
+    void put(const MacNodeId id, const Direction dir);
+
+    /**
      * @param id
      * @return The number of bands currently assigned to 'id'.
      */
     std::size_t getNumberAssignedBands(const MacNodeId& id) const;
 
     const std::vector<Band>& getBands(const MacNodeId& id) const;
+
+    const Direction& getDirection(const MacNodeId& id) const;
 
   private:
     /**
@@ -51,7 +60,7 @@ class SchedulingMemory {
         Direction _dir;
 
       public:
-        MemoryItem(MacNodeId id) : _id(id) {}
+        MemoryItem(MacNodeId id) : _id(id), _dir(UNKNOWN_DIRECTION) {}
 
         void putBand(Band band) {
           _assignedBands.push_back(band);

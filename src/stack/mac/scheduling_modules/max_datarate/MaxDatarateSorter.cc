@@ -57,3 +57,26 @@ void MaxDatarateSorter::remove(const MacNodeId id) {
     }
   }
 }
+
+const Band MaxDatarateSorter::getBestBand(const MacNodeId& id) const {
+  Band bestBand(0);
+  double bestRate = -1;
+  // Go through all bands.
+  for (Band band(0); band < mNumBands; band++) {
+    // Grab all <id, rate> pairs.
+    const std::vector<IdRatePair>& ratesVec = at(band);
+    // Find the right pair.
+    for (std::size_t i = 0; i < ratesVec.size(); i++) {
+      if (ratesVec.at(i).from == id) {
+        // Is this the best rate yet?
+        if (ratesVec.at(i).rate > bestRate) {
+          bestBand = band;
+          bestRate = ratesVec.at(i).rate;
+        }
+        // Stop looking for this band.
+        break;
+      }
+    }
+  }
+  return bestBand;
+}

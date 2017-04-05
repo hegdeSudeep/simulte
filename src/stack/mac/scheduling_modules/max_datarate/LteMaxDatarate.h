@@ -10,6 +10,7 @@
 #include "LteCommon.h"
 #include <OmniscientEntity.h>
 #include <MaxDatarateSorter.h>
+#include <SchedulingMemory.h>
 
 /**
  * Implementation of the algorithm proposed by
@@ -55,18 +56,19 @@ public:
 protected:
     OmniscientEntity* mOracle = nullptr;
 
-    MaxDatarateSorter* sortBandsByDatarate();
+    MaxDatarateSorter* sortBandsByDatarate(SchedulingMemory* memory);
 
     /**
      * Assigns each resource block to that device that is expected to have the largest channel capacity on it.
      * Corresponds to the algorithm's first step.
+     * @return Whether the terminate flag has been set, which instructs is to stop all scheduling.
      */
-    void preparePhase1();
+    bool phase1(MaxDatarateSorter* sorter, SchedulingMemory* memory);
     /**
      * Double-assigns resource blocks to devices that left the first round empty-handed.
      * Corresponds to the algorithm's second step.
      */
-    void preparePhase2();
+    void phase2(MaxDatarateSorter* sorter, SchedulingMemory* memory);
 
     /**
      * Determines first match for a D2D endpoint for this node

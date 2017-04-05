@@ -53,3 +53,21 @@ std::size_t SchedulingMemory::getNumberAssignedBands(const MacNodeId &id) const 
 const std::vector<Band>& SchedulingMemory::getBands(const MacNodeId &id) const {
   return get(id).getBands();
 }
+
+void SchedulingMemory::put(const MacNodeId id, const Direction dir) {
+  // Is there an item for 'id' already?
+  try {
+    MemoryItem &item = get(id);
+    item.setDir(dir);
+    // If not, create it.
+  } catch (const exception& e) {
+    _memory.push_back(MemoryItem(id));
+    MemoryItem &item = _memory.at(_memory.size() - 1);
+    item.setDir(dir);
+  }
+}
+
+const Direction &SchedulingMemory::getDirection(const MacNodeId &id) const {
+  return get(id).getDir();
+}
+

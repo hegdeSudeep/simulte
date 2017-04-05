@@ -16,40 +16,6 @@ LteMaxDatarate::LteMaxDatarate() {
 
 LteMaxDatarate::~LteMaxDatarate() {}
 
-MacNodeId LteMaxDatarate::determineD2DEndpoint(MacNodeId srcNode) const {
-    EV_STATICCONTEXT;
-    EV << NOW << " LteMaxDatarate::determineD2DEndpoint" << std::endl;
-    // Grab <from, <to, mode>> map for all 'from' nodes.
-    const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* map = mOracle->getModeSelectionMap();
-    if (map == nullptr)
-        throw cRuntimeError("LteMaxDatarate::determineD2DEndpoint couldn't get a mode selection map from the oracle.");
-    // From there, grab <src, <to, mode>> for given 'srcNode'.
-    const std::map<MacNodeId, LteD2DMode> destinationModeMap = map->at(srcNode);
-    if (destinationModeMap.size() <= 0)
-        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint <src, <to, mode>> map is empty -> couldn't find an end point from node " + std::to_string(srcNode)).c_str());
-    MacNodeId dstNode = 0;
-    bool foundIt = false;
-    // Go through all possible destinations.
-    for (std::map<MacNodeId, LteD2DMode>::const_iterator iterator = destinationModeMap.begin();
-            iterator != destinationModeMap.end(); iterator++) {
-        EV << "\tChecking candidate node " << (*iterator).first << "... ";
-        // Check if it wanted to run in Direct Mode.
-        if ((*iterator).second == LteD2DMode::DM) {
-            // If yes, then consider this the endpoint.
-            // @TODO this seems like a hacky workaround. >1 endpoints are not supported with this approach.
-            foundIt = true;
-            dstNode = (*iterator).first;
-            EV << "found D2D partner." << std::endl;
-            break;
-        }
-        EV << "nope." << std::endl;
-    }
-    if (!foundIt)
-        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint couldn't find an end point from node " + std::to_string(srcNode)).c_str());
-    EV << NOW << " LteMaxDatarate::determineD2DEndpoint found " << srcNode << " --> " << dstNode << "." << std::endl;
-    return dstNode;
-}
-
 void LteMaxDatarate::prepareSchedule() {
     EV_STATICCONTEXT;
     EV << NOW << "LteMaxDatarate::prepareSchedule" << std::endl;
@@ -57,12 +23,17 @@ void LteMaxDatarate::prepareSchedule() {
     // Copy currently active connections to a working copy.
     activeConnectionTempSet_ = activeConnectionSet_;
 
+    // We need to remember for each node in which direction it wants to transmit and which bands are assigned to it.
+    // For that, this pointer is passed around the various functions, and updated by each one accordingly.
+    SchedulingMemory* memory = new SchedulingMemory();
+
     // For all connections, we want all resource blocks sorted by their estimated maximum datarate.
     // The sorter holds each connection's info: from, to, direction, datarate and keeps entries
     // sorted by datarate in descending order.
-    MaxDatarateSorter* sorter = sortBandsByDatarate();
+    MaxDatarateSorter* sorter = sortBandsByDatarate(memory);
 
-    // nullptr is returned if the oracle is not ready yet.
+    // 'nullptr' is returned if the oracle is not ready yet.
+    // In this case we can't do scheduling yet.
     if (sorter == nullptr)
         return;
 
@@ -70,110 +41,30 @@ void LteMaxDatarate::prepareSchedule() {
     EV << "RBs sorted according to their throughputs: " << std::endl;
     EV << sorter->toString() << std::endl;
 
-    // Go through all bands.
-    for (Band band = 0; band < sorter->size(); band++) {
-        std::vector<IdRatePair> list = sorter->at(band);
-        if (list.size() <= 0) {
-            EV << "Skipping empty list for band " << band << "." << std::endl;
-            continue;
-        }
-        // Assign band to best candidate.
-        IdRatePair& bestCandidate = list.at(0);
-
-        EV << NOW << "LteMaxDatarate::prepareSchedule granting " << bestCandidate.from << " -"
-           << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to;
-
-        SchedulingResult grantAnswer = schedule(bestCandidate.connectionId, band);
-
-        EV << NOW << "LteMaxDatarate::prepareSchedule grant answer is "
-           << (grantAnswer == SchedulingResult::TERMINATE ? "TERMINATE" :
-               grantAnswer == SchedulingResult::INACTIVE ? "INACTIVE" :
-               grantAnswer == SchedulingResult::INELIGIBLE ? "INELIGIBLE" :
-               "OK") << std::endl;
-
-        // Exit immediately if the terminate flag is set.
-        if (grantAnswer == SchedulingResult::TERMINATE) {
-            EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
-            // The 'terminate' flag is set if a codeword is already allocated
-            // or if the OFDM space has ended. The way I understand it is that nothing further
-            // can be scheduled in this scheduling round.
-            return;
-        }
-
-        // Set the connection as inactive if indicated by the grant.
-        if (grantAnswer == SchedulingResult::INACTIVE) {
-            EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
-            activeConnectionTempSet_.erase(bestCandidate.from);
-            // A connection is set as inactive if the node's queue length is 0.
-            // This means nothing needs to be scheduled to this node anymore,
-            // so remove it from our container so it's not considered anymore.
-            sorter->remove(bestCandidate.from);
-            continue;
-        }
-
-        // Now check if the same candidate should be assigned consecutive resource blocks.
-        for (Band consecutiveBand = band + 1; consecutiveBand < sorter->size(); consecutiveBand++) {
-            // Determine throughput for halved transmit power.
-            double halvedTxPower = bestCandidate.txPower / 2;
-            std::vector<double> consecutiveSINRs = mOracle->getSINR(bestCandidate.from, bestCandidate.to, NOW, halvedTxPower);
-            double associatedSinr = consecutiveSINRs.at(consecutiveBand);
-            double estimatedThroughput = mOracle->getChannelCapacity(associatedSinr);
-            EV << "Determined throughput for consecutive band " << consecutiveBand << " at halved transmit power of "
-               << halvedTxPower << ": " << estimatedThroughput << std::endl;
-
-            // Is this better than the next best candidate?
-            std::vector<IdRatePair> consecutiveList = sorter->at(consecutiveBand);
-            IdRatePair& bestConsecutiveCandidate = consecutiveList.at(0);
-
-            if (bestConsecutiveCandidate.rate < estimatedThroughput) {
-                EV << "Consecutive throughput at halved txPower is still better than the best candidate: "
-                   << bestConsecutiveCandidate.rate << " < " << estimatedThroughput << std::endl;
-                // Assign this band also.
-                grantAnswer = schedule(bestCandidate.connectionId, band);
-
-                EV << NOW << "LteMaxDatarate::prepareSchedule grant answer is "
-                   << (grantAnswer == SchedulingResult::TERMINATE ? "TERMINATE" :
-                       grantAnswer == SchedulingResult::INACTIVE ? "INACTIVE" :
-                       grantAnswer == SchedulingResult::INELIGIBLE ? "INELIGIBLE" :
-                       "OK") << std::endl;
-
-                // Increment band so that this band is not double-assigned.
-                band++;
-                // Update txPower so that next consecutive check halves txPower again.
-                bestCandidate.txPower = halvedTxPower;
-
-                // Exit immediately if the terminate flag is set.
-                if (grantAnswer == SchedulingResult::TERMINATE) {
-                    EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
-                    break;
-                }
-
-                // Set the connection as inactive if indicated by the grant.
-                if (grantAnswer == SchedulingResult::INACTIVE) {
-                    EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
-                    activeConnectionTempSet_.erase(bestCandidate.from);
-                    // A connection is set as inactive if the node's queue length is 0.
-                    // This means nothing needs to be scheduled to this node anymore,
-                    // so remove it from our container so it's not considered anymore.
-                    sorter->remove(bestCandidate.from);
-                    continue;
-                }
-            // Current candidate transmitting at halved power has worse throughput than next candidate.
-            } else {
-                EV << "Consecutive throughput at halved txPower is not better than the best candidate: "
-                   << bestConsecutiveCandidate.rate << " >= " << estimatedThroughput << std::endl;
-                // Remove current candidate as it shouldn't be assigned any more resource blocks in this scheduling round.
-                sorter->remove(bestCandidate.from);
-                // Quit checking consecutive bands. Next band will be assigned to the next best candidate.
-                break;
-            }
-        }
+    // Now initiate phase 1 of the algorithm:
+    // Go through all bands
+    //   assign the band to the best candidate throughput-wise
+    //   check for consecutive bands if the same candidate is also the best for this band,
+    //   even if it transmits at halved power.
+    bool terminateFlagSet = phase1(sorter, memory);
+    // If the allocation of a band to a connection triggered the terminate flag,
+    // then we have to stop scheduling altogether.
+    if (terminateFlagSet) {
+        delete sorter;
+        delete memory;
+        return;
     }
 
+    // Phase 2 of the algorithm checks for D2D pairs that went without any assigned bands.
+    // If there are any, they are reassigned that band that yields the highest datarate for them.
+    phase2(sorter, memory);
+
+    // Scheduling is done. Delete the pointers, new ones will be instantiated in the next scheduling round.
     delete sorter;
+    delete memory;
 }
 
-MaxDatarateSorter* LteMaxDatarate::sortBandsByDatarate() {
+MaxDatarateSorter* LteMaxDatarate::sortBandsByDatarate(SchedulingMemory* memory) {
     int numBands;
     try {
         numBands = mOracle->getNumberOfBands();
@@ -205,6 +96,9 @@ MaxDatarateSorter* LteMaxDatarate::sortBandsByDatarate() {
             dir = DL;
 
         EV << "\tNode " << nodeId << " wants to transmit in " << dirToA(dir) << " direction." << std::endl;
+
+        // Save it to memory.
+        memory->put(nodeId, dir);
 
         // Determine device's maximum transmission power.
         double maxTransmitPower = mOracle->getTransmissionPower(nodeId, dir);
@@ -255,8 +149,155 @@ MaxDatarateSorter* LteMaxDatarate::sortBandsByDatarate() {
     return sorter;
 }
 
-void LteMaxDatarate::preparePhase1() {
+bool LteMaxDatarate::phase1(MaxDatarateSorter* sorter, SchedulingMemory* memory) {
+    EV << NOW << "LteMaxDatarate::phase1" << endl;
+    // Go through all bands.
+    for (Band band = 0; band < sorter->size(); band++) {
+        std::vector<IdRatePair> list = sorter->at(band);
+        if (list.size() <= 0) {
+            EV << "Skipping empty list for band " << band << "." << std::endl;
+            continue;
+        }
+        // Assign band to best candidate.
+        IdRatePair& bestCandidate = list.at(0);
 
+        EV << NOW << "LteMaxDatarate::prepareSchedule granting " << bestCandidate.from << " -"
+           << dirToA(bestCandidate.dir) << "-> " << bestCandidate.to;
+
+        SchedulingResult grantAnswer = schedule(bestCandidate.connectionId, band);
+        // Save decision to memory.
+        memory->put(bestCandidate.from, band);
+
+        EV << NOW << "LteMaxDatarate::prepareSchedule grant answer is "
+           << (grantAnswer == SchedulingResult::TERMINATE ? "TERMINATE" :
+               grantAnswer == SchedulingResult::INACTIVE ? "INACTIVE" :
+               grantAnswer == SchedulingResult::INELIGIBLE ? "INELIGIBLE" :
+               "OK") << std::endl;
+
+        // Exit immediately if the terminate flag is set.
+        if (grantAnswer == SchedulingResult::TERMINATE) {
+            EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
+            // The 'terminate' flag is set if a codeword is already allocated
+            // or if the OFDM space has ended. The way I understand it is that nothing further
+            // can be scheduled in this scheduling round.
+            return true;
+        }
+
+        // Set the connection as inactive if indicated by the grant.
+        if (grantAnswer == SchedulingResult::INACTIVE) {
+            EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
+            activeConnectionTempSet_.erase(bestCandidate.from);
+            // A connection is set as inactive if the node's queue length is 0.
+            // This means nothing needs to be scheduled to this node anymore,
+            // so remove it from our container so it's not considered anymore.
+            sorter->remove(bestCandidate.from);
+            continue;
+        }
+
+        // Now check if the same candidate should be assigned consecutive resource blocks.
+        for (Band consecutiveBand = band + 1; consecutiveBand < sorter->size(); consecutiveBand++) {
+            // Determine throughput for halved transmit power.
+            double halvedTxPower = bestCandidate.txPower / 2;
+            std::vector<double> consecutiveSINRs = mOracle->getSINR(bestCandidate.from, bestCandidate.to, NOW, halvedTxPower);
+            double associatedSinr = consecutiveSINRs.at(consecutiveBand);
+            double estimatedThroughput = mOracle->getChannelCapacity(associatedSinr);
+            EV << "Determined throughput for consecutive band " << consecutiveBand << " at halved transmit power of "
+               << halvedTxPower << ": " << estimatedThroughput << std::endl;
+
+            // Is this better than the next best candidate?
+            std::vector<IdRatePair> consecutiveList = sorter->at(consecutiveBand);
+            IdRatePair& bestConsecutiveCandidate = consecutiveList.at(0);
+
+            if (bestConsecutiveCandidate.rate < estimatedThroughput) {
+                EV << "Consecutive throughput at halved txPower is still better than the best candidate: "
+                   << bestConsecutiveCandidate.rate << " < " << estimatedThroughput << std::endl;
+                // Assign this band also.
+                grantAnswer = schedule(bestCandidate.connectionId, consecutiveBand);
+                memory->put(bestCandidate.from, consecutiveBand);
+
+                EV << NOW << "LteMaxDatarate::prepareSchedule grant answer is "
+                   << (grantAnswer == SchedulingResult::TERMINATE ? "TERMINATE" :
+                       grantAnswer == SchedulingResult::INACTIVE ? "INACTIVE" :
+                       grantAnswer == SchedulingResult::INELIGIBLE ? "INELIGIBLE" :
+                       "OK") << std::endl;
+
+                // Increment outer loop's 'band' so that 'consecutiveBand' is not double-assigned.
+                band++;
+                // Update txPower so that next consecutive check halves txPower again.
+                bestCandidate.txPower = halvedTxPower;
+
+                // Exit immediately if the terminate flag is set.
+                if (grantAnswer == SchedulingResult::TERMINATE) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
+                    return true;
+                }
+
+                // Set the connection as inactive if indicated by the grant.
+                if (grantAnswer == SchedulingResult::INACTIVE) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule setting " << bestCandidate.from << " to inactive" << std::endl;
+                    activeConnectionTempSet_.erase(bestCandidate.from);
+                    // A connection is set as inactive if the node's queue length is 0.
+                    // This means nothing needs to be scheduled to this node anymore,
+                    // so remove it from our container so it's not considered anymore.
+                    sorter->remove(bestCandidate.from);
+                    continue;
+                }
+            // Current candidate transmitting at halved power has worse throughput than next candidate.
+            } else {
+                EV << "Consecutive throughput at halved txPower is not better than the best candidate: "
+                   << bestConsecutiveCandidate.rate << " >= " << estimatedThroughput << std::endl;
+                // Remove current candidate as it shouldn't be assigned any more resource blocks in this scheduling round.
+                sorter->remove(bestCandidate.from);
+                // Quit checking consecutive bands. Next band will be assigned to the next best candidate.
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+void LteMaxDatarate::phase2(MaxDatarateSorter* sorter, SchedulingMemory* memory) {
+    EV << NOW << "LteMaxDatarate::phase2" << endl;
+    // Determine D2D pairs that went unassigned.
+    for (ActiveSet::iterator iterator = activeConnectionTempSet_.begin(); iterator != activeConnectionTempSet_.end (); ++iterator) {
+        MacCid currentConnection = *iterator;
+        MacNodeId nodeId = MacCidToNodeId(currentConnection);
+        const Direction& dir = memory->getDirection(nodeId);
+        if (dir == Direction::D2D) {
+            if (memory->getNumberAssignedBands(nodeId) == 0) {
+                // Found an unassigned pair.
+                EV << NOW << "Node " << nodeId << " has not been assigned a band yet." << endl;
+                // Reassign that band that has the best datarate for this node.
+                Band bestBand = sorter->getBestBand(nodeId);
+                EV << "Reassigning band " << bestBand << " to node " << nodeId << endl;
+                SchedulingResult grantAnswer = schedule(currentConnection, bestBand);
+                memory->put(nodeId, bestBand);
+
+                EV << NOW << "LteMaxDatarate::prepareSchedule grant answer is "
+                   << (grantAnswer == SchedulingResult::TERMINATE ? "TERMINATE" :
+                       grantAnswer == SchedulingResult::INACTIVE ? "INACTIVE" :
+                       grantAnswer == SchedulingResult::INELIGIBLE ? "INELIGIBLE" :
+                       "OK") << std::endl;
+
+                // Exit immediately if the terminate flag is set.
+                if (grantAnswer == SchedulingResult::TERMINATE) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule exiting due to terminate flag being set." << std::endl;
+                    return;
+                }
+
+                // Set the connection as inactive if indicated by the grant.
+                if (grantAnswer == SchedulingResult::INACTIVE) {
+                    EV << NOW << "LteMaxDatarate::prepareSchedule setting " << nodeId << " to inactive" << std::endl;
+                    activeConnectionTempSet_.erase(nodeId);
+                    // A connection is set as inactive if the node's queue length is 0.
+                    // This means nothing needs to be scheduled to this node anymore,
+                    // so remove it from our container so it's not considered anymore.
+                    sorter->remove(nodeId);
+                    continue;
+                }
+            }
+        }
+    }
 }
 
 LteMaxDatarate::SchedulingResult LteMaxDatarate::schedule(MacCid connectionId, Band band) {
@@ -284,6 +325,40 @@ void LteMaxDatarate::commitSchedule() {
     EV_STATICCONTEXT;
     EV << "LteMaxDatarate::commitSchedule" << std::endl;
     activeConnectionSet_ = activeConnectionTempSet_;
+}
+
+MacNodeId LteMaxDatarate::determineD2DEndpoint(MacNodeId srcNode) const {
+    EV_STATICCONTEXT;
+    EV << NOW << " LteMaxDatarate::determineD2DEndpoint" << std::endl;
+    // Grab <from, <to, mode>> map for all 'from' nodes.
+    const std::map<MacNodeId, std::map<MacNodeId, LteD2DMode>>* map = mOracle->getModeSelectionMap();
+    if (map == nullptr)
+        throw cRuntimeError("LteMaxDatarate::determineD2DEndpoint couldn't get a mode selection map from the oracle.");
+    // From there, grab <src, <to, mode>> for given 'srcNode'.
+    const std::map<MacNodeId, LteD2DMode> destinationModeMap = map->at(srcNode);
+    if (destinationModeMap.size() <= 0)
+        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint <src, <to, mode>> map is empty -> couldn't find an end point from node " + std::to_string(srcNode)).c_str());
+    MacNodeId dstNode = 0;
+    bool foundIt = false;
+    // Go through all possible destinations.
+    for (std::map<MacNodeId, LteD2DMode>::const_iterator iterator = destinationModeMap.begin();
+            iterator != destinationModeMap.end(); iterator++) {
+        EV << "\tChecking candidate node " << (*iterator).first << "... ";
+        // Check if it wanted to run in Direct Mode.
+        if ((*iterator).second == LteD2DMode::DM) {
+            // If yes, then consider this the endpoint.
+            // @TODO this seems like a hacky workaround. >1 endpoints are not supported with this approach.
+            foundIt = true;
+            dstNode = (*iterator).first;
+            EV << "found D2D partner." << std::endl;
+            break;
+        }
+        EV << "nope." << std::endl;
+    }
+    if (!foundIt)
+        throw cRuntimeError(std::string("LteMaxDatarate::determineD2DEndpoint couldn't find an end point from node " + std::to_string(srcNode)).c_str());
+    EV << NOW << " LteMaxDatarate::determineD2DEndpoint found " << srcNode << " --> " << dstNode << "." << std::endl;
+    return dstNode;
 }
 
 void LteMaxDatarate::notifyActiveConnection(MacCid conectionId) {

@@ -54,6 +54,12 @@ class MaxDatarateSorter {
     const std::vector<IdRatePair>& at(const Band &band) const;
 
     /**
+     * @param id
+     * @return The best band datarate-wise for 'id'.
+     */
+    const Band getBestBand(const MacNodeId& id) const;
+
+    /**
      * @return The number of bands.
      */
     size_t size() const;
