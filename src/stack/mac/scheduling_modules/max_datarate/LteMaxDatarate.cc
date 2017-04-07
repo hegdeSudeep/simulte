@@ -335,7 +335,7 @@ void LteMaxDatarate::phase1_d2d(MaxDatarateSorter* sorter, SchedulingMemory* mem
         for (Band consecutiveBand = band + 1; consecutiveBand < sorter->size(); consecutiveBand++) {
             if (alreadyAssignedBands.size() > 0 && std::find(alreadyAssignedBands.begin(), alreadyAssignedBands.end(), band) != alreadyAssignedBands.end()) {
                 // Band already assigned to a cellular user.
-                EV << NOW << " LteMaxDatarate::phase1_d2d skipping consecutive band " << consecutiveBand << " because it's already assigned." << std::endl;
+                EV << NOW << " LteMaxDatarate::phase1_d2d skipping consecutive band " << consecutiveBand << " because it's already assigned to a cellular user." << std::endl;
                 continue;
             }
             // Determine throughput for halved transmit power.
