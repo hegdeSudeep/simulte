@@ -22,12 +22,38 @@ void MaxDatarateSorter::put(const Band &band, const IdRatePair& idRatePair) {
   list.push_back(idRatePair);
 }
 
-const IdRatePair& MaxDatarateSorter::get(const Band& band, const size_t& position) const {
-  return mBandToIdRate.at(band).at(position);
-}
-
 const std::vector<IdRatePair>& MaxDatarateSorter::at(const Band& band) const {
     return mBandToIdRate.at(band);
+}
+
+const std::vector<IdRatePair> MaxDatarateSorter::at(const Band &band, const Direction &dir) const {
+  std::vector<IdRatePair> allPairs = mBandToIdRate.at(band);
+  for (std::vector<IdRatePair>::iterator it = allPairs.begin(); it < allPairs.end(); it++) {
+    IdRatePair& pair = *it;
+    if (pair.dir != dir) {
+      allPairs.erase(it);
+      // Size has decreased by one, so decrease 'it' in order to target next element correctly.
+      it--;
+    }
+  }
+  return allPairs;
+}
+
+const std::vector<IdRatePair> MaxDatarateSorter::at_nonD2D(const Band &band) const {
+  std::vector<IdRatePair> allPairs = mBandToIdRate.at(band);
+  for (std::vector<IdRatePair>::iterator it = allPairs.begin(); it < allPairs.end(); it++) {
+    IdRatePair& pair = *it;
+    if (pair.dir == Direction::D2D) {
+      allPairs.erase(it);
+      // Size has decreased by one, so decrease 'it' in order to target next element correctly.
+      it--;
+    }
+  }
+  return allPairs;
+}
+
+const IdRatePair& MaxDatarateSorter::get(const Band& band, const size_t& position) const {
+    return at(band).at(position);
 }
 
 size_t MaxDatarateSorter::size() const {

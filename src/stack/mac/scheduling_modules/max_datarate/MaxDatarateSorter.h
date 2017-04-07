@@ -51,7 +51,25 @@ class MaxDatarateSorter {
      * @return The xth best node according to throughput.
      */
     const IdRatePair& get(const Band& band, const size_t& position) const;
+
+    /**
+     * @param band
+     * @return All <id, throughput> pairs for 'band'.
+     */
     const std::vector<IdRatePair>& at(const Band &band) const;
+
+    /**
+     * @param band
+     * @param dir
+     * @return All <id, throughput> pairs for 'band' where 'id' wants to transmit in 'dir' direction.
+     */
+    const std::vector<IdRatePair> at(const Band& band, const Direction& dir) const;
+
+    /**
+     * @param band
+     * @return All <id, throughput> pairs for 'band' where 'id' wants to transmit in any non-D2D direction.
+     */
+    const std::vector<IdRatePair> at_nonD2D(const Band& band) const;
 
     /**
      * @param id

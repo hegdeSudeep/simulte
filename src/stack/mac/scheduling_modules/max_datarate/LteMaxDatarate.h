@@ -58,12 +58,10 @@ protected:
 
     MaxDatarateSorter* sortBandsByDatarate(SchedulingMemory* memory);
 
-    /**
-     * Assigns each resource block to that device that is expected to have the largest channel capacity on it.
-     * Corresponds to the algorithm's first step.
-     * @return Whether the terminate flag has been set, which instructs is to stop all scheduling.
-     */
-    bool phase1(MaxDatarateSorter* sorter, SchedulingMemory* memory);
+    std::vector<Band> phase1_cellular(MaxDatarateSorter* sorter, SchedulingMemory* memory);
+
+    void phase1_d2d(MaxDatarateSorter* sorter, SchedulingMemory* memory, std::vector<Band>& alreadyAssignedBands);
+
     /**
      * Double-assigns resource blocks to devices that left the first round empty-handed.
      * Corresponds to the algorithm's second step.
