@@ -311,7 +311,7 @@ void OmniscientEntity::initialize() {
     scheduleAt(mConfigTimepoint + mUpdateInterval, mSnapshotMsg);
 
     // Schedule saving allocation history to file at end of simulation.
-    scheduleAt(maxSimTime - 1, mSaveAllocationHistoryMsg);
+    scheduleAt(maxSimTime, mSaveAllocationHistoryMsg);
 }
 
 /**
@@ -509,8 +509,9 @@ void OmniscientEntity::printSchedulingHistory(const std::string& filename) const
             const MacNodeId id = ueInfo->at(j)->id;
             try {
                 const std::vector<Band>& bands = memory.getBands(id);
+                const std::vector<bool>& reassignments = memory.getReassignments(id);
                 for (size_t k = 0; k < bands.size(); k++)
-                    outfile << (k == 0 ? "\t" : "") << bands.at(k) << (k < bands.size() - 1 ? "," : "");
+                    outfile << (k == 0 ? "\t" : "") << bands.at(k) << (reassignments.at(k) ? "r" : "") << (k < bands.size() - 1 ? "," : "");
             } catch (const std::exception& e) {
                 // No bands allocated for this timepoint.
                 outfile << "\tX";
