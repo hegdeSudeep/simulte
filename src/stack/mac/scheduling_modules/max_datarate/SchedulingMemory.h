@@ -24,6 +24,10 @@
  */
 class SchedulingMemory {
   public:
+
+    SchedulingMemory();
+    SchedulingMemory(const SchedulingMemory& other);
+
     /**
      * Notify a 'band' being assigned to 'id'.
      * @param id

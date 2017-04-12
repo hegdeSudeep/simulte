@@ -80,6 +80,10 @@ void LteMaxDatarate::prepareSchedule() {
     // If there are any, they are reassigned that band that yields the highest datarate for them.
     phase2(sorter, memory);
 
+    // Notify the omniscient entity of this scheduling round.
+    // If it is configured to record the decisions then it'll do so. Otherwise this doesn't do anything.
+    mOracle->recordSchedulingRound(*memory);
+
     // Scheduling is done. Delete the pointers, new ones will be instantiated in the next scheduling round.
     delete sorter;
     delete memory;
