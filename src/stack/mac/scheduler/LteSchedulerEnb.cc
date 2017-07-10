@@ -18,6 +18,7 @@
 #include "LteMaxCiComp.h"
 #include "LteMacBuffer.h"
 #include "LteMacQueue.h"
+#include "LteRandom.h"
 
 LteSchedulerEnb::LteSchedulerEnb()
 {
@@ -830,6 +831,8 @@ LteScheduler* LteSchedulerEnb::getScheduler(SchedDiscipline discipline)
         return new LteMaxCiOptMB();
         case MAXCI_COMP:
         return new LteMaxCiComp();
+        case RANDOM:
+        return new LteRandom();
 
         default:
         throw cRuntimeError("LteScheduler not recognized");
