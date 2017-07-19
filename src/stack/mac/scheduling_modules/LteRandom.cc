@@ -14,13 +14,13 @@ void LteRandom::prepareSchedule()
         int randomCid =  getRandomInt(activeSetSize);
 
         ActiveSet::iterator it = activeConnectionTempSet_.begin();
-        advance(it,randomCid);
+        advance(it,randomCid-1);
 
         //Chosen cid to schedule
         MacCid chosenCid = *it;
 
-        //Random bytes to allocate, between 0 and 100 bytes
-        int randomBytes = getRandomInt(100);
+        //Random bytes to allocate, between 0 and 'randomSchedulerBytes', set in LteMac.ned
+        int randomBytes = getRandomInt(mac_->par("randomSchedulerBytes"));
 
         //Schedule the picked Cid with the random bytes
         bool terminate = false;
@@ -70,8 +70,8 @@ void LteRandom::removeActiveConnection(MacCid cid)
 
 int LteRandom::getRandomInt(int limit)
 {
-    static std::random_device rd; // obtain a random number from hardware
-    static std::mt19937 eng(rd()); // seed the generator
+    static int randomSchedulerSeed_ = mac_->par("randomSchedulerSeed"); // obtain a random number from hardware
+    static std::mt19937 eng(randomSchedulerSeed_); // seed the generator
     std::uniform_int_distribution<> distr(0, limit); //
     return distr(eng);
 }

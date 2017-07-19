@@ -272,6 +272,10 @@ simple LteMacEnb extends LteMacBase {
         // Proportional Fair parameters
         double pfAlpha    = default(0.95);
         
+        //Random Scheduler seed
+        int randomSchedulerSeed = default(1);
+        int randomSchedulerBytes = default(10);
+        
         // LTE Advanced Scheduler general parameters - DL
         int lteAallocationRbsDl = default(1);
         int lteAhistorySizeDL = default(20);
