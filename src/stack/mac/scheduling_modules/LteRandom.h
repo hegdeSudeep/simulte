@@ -21,6 +21,9 @@ class LteRandom : public virtual LteScheduler
 
     // *****************************************************************************************
 
+    //Returns a random number in the range 0 and 'limit'
+    int getRandomInt(int limit);
+
     void notifyActiveConnection(MacCid cid);
 
     void removeActiveConnection(MacCid cid);
