@@ -7,6 +7,7 @@ void LteRandom::prepareSchedule()
 
     activeConnectionTempSet_ = activeConnectionSet_;
     int activeSetSize = activeConnectionTempSet_.size();
+    eNbScheduler_->mac_->emit(numActiveConnections_, activeSetSize);
 
     try{
 

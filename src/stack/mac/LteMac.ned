@@ -133,6 +133,10 @@ simple LteMacBase like LteMac {
         //# signals for indicating buffer overflow
         @signal[macBufferOverflowUl];
         @signal[macBufferOverflowDl];
+        
+        //# Scheduler stats
+        @signal[numActiveConnections];
+        @statistic[numActiveConnections](title="Number of active connections"; unit=""; source="numActiveConnections"; record=vector);
 
     gates:
         //# 

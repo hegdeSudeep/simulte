@@ -15,6 +15,15 @@ class LteRandom : public virtual LteScheduler
 {
   public:
 
+   /*
+    * Constructor
+    */
+
+    LteRandom(){
+        activeConnectionSet_.clear();
+        numActiveConnections_ = mac_->registerSignal("numActiveConnections");
+    }
+
     virtual void prepareSchedule();
 
     virtual void commitSchedule();

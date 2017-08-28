@@ -80,6 +80,8 @@ class LteScheduler
 
 //    CplexTest cplexTest_;
 
+    simsignal_t numActiveConnections_;
+
   public:
 
     /**
