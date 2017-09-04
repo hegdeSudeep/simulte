@@ -20,6 +20,8 @@ void LtePf::prepareSchedule()
 
     // Create a working copy of the active set
     activeConnectionTempSet_ = activeConnectionSet_;
+    int activeSetSize = activeConnectionTempSet_.size();
+    eNbScheduler_->mac_->emit(numActiveConnections_, activeSetSize);
 
     // Build the score list by cycling through the active connections.
     ScoreList score;

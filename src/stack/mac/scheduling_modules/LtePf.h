@@ -34,6 +34,8 @@ class LtePf : public LteScheduler
 
   public:
 
+
+
     double & pfAlpha()
     {
         return pfAlpha_;
@@ -60,6 +62,8 @@ class LtePf : public LteScheduler
     {
         pfAlpha_ = pfAlpha;
         pfRate_.clear();
+
+        numActiveConnections_ = mac_->registerSignal("numActiveConnections");
     }
 };
 

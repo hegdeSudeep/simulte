@@ -18,7 +18,7 @@ simple VoIPReceiver like IUDPApp
         int localPort = default(3000);
         int emodel_Ie_ = default(5);
         int emodel_Bpl_ = default(10);
-        int emodel_A_ = default(5);
+        int emodel_A_ = default(0);
         double emodel_Ro_ = default(93.2);
         double playout_delay @unit("s") = default(0s);
         int dim_buffer = default(20);

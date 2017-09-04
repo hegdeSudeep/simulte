@@ -59,6 +59,14 @@ class LteDrr : public LteScheduler
 
   public:
 
+    /*
+     * Constructor
+     */
+
+    LteDrr(){
+        activeConnectionSet_.clear();
+        numActiveConnections_ = mac_->registerSignal("numActiveConnections");
+    }
     // Scheduling functions ********************************************************************
 
     //virtual void schedule ();
